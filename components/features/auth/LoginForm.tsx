@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Eye, EyeOff, Mail, Lock, Store } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function LoginForm() {
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, error, clearError, requiresPasswordReset } = useAuth();
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
@@ -20,31 +20,33 @@ export function LoginForm() {
     rememberMe: false,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
+
+  // Handle navigation based on auth state
+  useEffect(() => {
+    if (requiresPasswordReset) {
+      router.push('/login/reset-password');
+    }
+  }, [requiresPasswordReset, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setLocalError('');
+    clearError();
 
     if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
+      setLocalError('Please fill in all fields');
       return;
     }
 
     try {
-      await login(formData.email, formData.password);
-      router.push('/'); // Redirect to dashboard
+      const success = await login({ email: formData.email, password: formData.password });
+      if (success && !requiresPasswordReset) {
+        router.push('/'); // Redirect to dashboard
+      }
     } catch (err: any) {
       console.error('Login error:', err);
-      
-      // Better error handling
-      if (err.message?.includes('Network')) {
-        setError('Network error: Please check your connection or try again later.');
-      } else if (err.message?.includes('Invalid credentials')) {
-        setError('Invalid email or password. Please try again.');
-      } else {
-        setError(err.message || 'Login failed. Please try again.');
-      }
+      // Error is handled by AuthContext
     }
   };
 
@@ -73,9 +75,9 @@ export function LoginForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
+            {(error || localError) && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{error || localError}</AlertDescription>
               </Alert>
             )}
 
@@ -153,11 +155,23 @@ export function LoginForm() {
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-600">
-            <p>Demo Credentials:</p>
-            <p className="mt-1">
-              <strong>Email:</strong> admin@quickcrate.com<br />
-              <strong>Password:</strong> admin123
+            <p>
+              New to QuickCrate? Please register for a merchant account first.
             </p>
+            <p className="mt-2 text-xs text-gray-500">
+              After registration, you'll receive temporary login credentials that will require a password reset for security.
+            </p>
+            {process.env.NEXT_PUBLIC_MOCK_API === 'true' && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg text-xs">
+                <p className="font-medium text-blue-800">Development Test Account:</p>
+                <p className="text-blue-700 mt-1">
+                  Email: <strong>test@merchant.com</strong>
+                </p>
+                <p className="text-blue-700">
+                  Password: Any password (will be prompted to reset)
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

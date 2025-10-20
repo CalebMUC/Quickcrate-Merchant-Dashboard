@@ -12,8 +12,8 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   
-  // Don't show layout for login page
-  if (pathname === '/login') {
+  // Don't show layout for auth pages
+  if (pathname === '/login' || pathname === '/login/reset-password') {
     return <>{children}</>;
   }
 

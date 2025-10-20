@@ -1,8 +1,6 @@
 import { ApiResponse, ApiError as ApiErrorType } from '@/types';
-import { mockApiService } from './mock';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7000/api';
-const USE_MOCK_API = process.env.NEXT_PUBLIC_MOCK_API === 'true';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7270/api';
 
 class ApiClient {
   private baseURL: string;
