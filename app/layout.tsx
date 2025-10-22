@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/lib/contexts/AuthContext"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -23,6 +24,7 @@ export default function RootLayout({
       <body className="antialiased">
         <AuthProvider>
           <DashboardLayout>{children}</DashboardLayout>
+          <Toaster />
         </AuthProvider>
       </body>
     </html>

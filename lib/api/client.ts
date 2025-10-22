@@ -28,17 +28,36 @@ class ApiClient {
     };
 
     try {
+      console.log('🌐 API Request:', { method: config.method || 'GET', url, body: config.body })
+      
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorText = await response.text();
+        let errorData;
+        
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        console.error('💥 API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorData
+        });
+        
         throw new ApiError(
           errorData.message || `HTTP error! status: ${response.status}`,
-          response.status.toString()
+          response.status.toString(),
+          errorData
         );
       }
 
       const data = await response.json();
+      console.log('✅ API Response:', data);
       return data;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -114,7 +133,7 @@ export const apiClient = new ApiClient();
 
 // Custom error class
 export class ApiError extends Error {
-  constructor(message: string, public code?: string) {
+  constructor(message: string, public code?: string, public response?: any) {
     super(message);
     this.name = 'ApiError';
   }

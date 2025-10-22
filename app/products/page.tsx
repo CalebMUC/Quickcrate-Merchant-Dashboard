@@ -1,3 +1,7 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProductsTable } from "@/components/products-table"
@@ -7,6 +11,17 @@ import { CategoriesManagement } from "@/components/categories-management"
 import { Package, Clock, CheckCircle, TrendingUp } from "lucide-react"
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState("all")
+
+  // Handle URL tab parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam && ['all', 'categories', 'pending', 'analytics'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [searchParams])
+
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div className="flex items-center justify-between">
@@ -65,7 +80,7 @@ export default function ProductsPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="all" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
           <TabsTrigger value="all" className="transition-all">
             All Products
