@@ -10,8 +10,6 @@ export interface LoginResponse {
   user: User;
 }
 
-<<<<<<< HEAD
-=======
 // Enhanced Authentication Types
 export interface AuthResponse {
   success: boolean;
@@ -41,7 +39,6 @@ export interface AuthState {
   requiresPasswordReset: boolean;
 }
 
->>>>>>> 3a62e13 (New Quickcrate-Merchant-Dashboard)
 export interface User {
   id: string;
   email: string;
@@ -49,12 +46,9 @@ export interface User {
   role: 'admin' | 'merchant' | 'staff';
   avatar?: string;
   merchantId?: string;
-<<<<<<< HEAD
-=======
   businessName?: string;
   isTemporaryPassword?: boolean;
   emailVerified?: boolean;
->>>>>>> 3a62e13 (New Quickcrate-Merchant-Dashboard)
   permissions: string[];
 }
 
