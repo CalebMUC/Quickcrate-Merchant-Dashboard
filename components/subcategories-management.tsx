@@ -322,8 +322,8 @@ export function SubcategoriesManagement() {
       </div>
 
       {/* Search Section */}
-      {/* <Card>
-        <CardContent className="p-4"> */}
+      <Card>
+        <CardContent className="p-4">
           <div className="flex items-center gap-2">
             <Search className="h-4 w-4 text-muted-foreground" />
             <Input
@@ -336,8 +336,8 @@ export function SubcategoriesManagement() {
               Search
             </Button>
           </div>
-        {/* </CardContent>
-      </Card> */}
+        </CardContent>
+      </Card>
 
       {/* Error State */}
       {error && (
@@ -368,14 +368,14 @@ export function SubcategoriesManagement() {
 
       {/* Subcategories Table */}
       {!loading && filteredSubcategories.length > 0 && (
-        // <Card>
-        //   <CardHeader>
-        //     <CardTitle>Subcategories</CardTitle>
-        //     <CardDescription>
-        //       Manage your product subcategories and their parent categories
-        //     </CardDescription>
-        //   </CardHeader>
-          // <CardContent>
+        <Card>
+          <CardHeader>
+            <CardTitle>Subcategories</CardTitle>
+            <CardDescription>
+              Manage your product subcategories and their parent categories
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -451,8 +451,8 @@ export function SubcategoriesManagement() {
                 ))}
               </TableBody>
             </Table>
-          {/* </CardContent>
-        </Card> */}
+          </CardContent>
+        </Card>
       )}
 
       {/* Empty State */}

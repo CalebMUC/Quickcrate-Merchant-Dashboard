@@ -1,12 +1,9 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "../styles/globals.css"
 import { AuthProvider } from "@/lib/contexts/AuthContext"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Toaster } from "@/components/ui/toaster"
-
-const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "MerchantHub - E-Commerce Dashboard",
@@ -20,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.className}>
+    <html lang="en" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}>
       <body className="antialiased">
         <AuthProvider>
           <DashboardLayout>{children}</DashboardLayout>
