@@ -94,6 +94,13 @@ export function CategoriesManagement() {
     name: string
   } | null>(null)
   
+  // Success Dialog States
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<{
+    title: string
+    description: string
+  } | null>(null)
+  
   // Form States
   const [categoryForm, setCategoryForm] = useState<CreateCategoryDto | UpdateCategoryDto>({
     name: "",
@@ -109,7 +116,9 @@ export function CategoriesManagement() {
   const [subCategoryForm, setSubCategoryForm] = useState<CreateSubCategoryDto | UpdateSubCategoryDto>({
     name: "",
     description: "",
+    slug: "",
     categoryId: "",
+    imageUrl: "",
     isActive: true,
     sortOrder: 0
   })
@@ -158,7 +167,7 @@ export function CategoriesManagement() {
         const categoriesWithHierarchy = await Promise.all(
         response.categories.map(async (category: Category) => {
           try {
-            const subcategories = await categoriesService.getSubCategories(category.id)
+            const subcategories = await categoriesService.getSubCategories(category.categoryId || category.id)
             
             // Load sub-subcategories for each subcategory
             const subcategoriesWithSubSub = await Promise.all(
@@ -294,8 +303,35 @@ export function CategoriesManagement() {
 
   const handleCreateSubCategory = async () => {
     try {
+      // Validate required fields
+      if (!subCategoryForm.name?.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Subcategory name is required.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!subCategoryForm.categoryId) {
+        toast({
+          title: "Validation Error", 
+          description: "Please select a parent category.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const newSubCategory = await categoriesService.createSubCategory(subCategoryForm as CreateSubCategoryDto)
       
+      // Show success dialog
+      setSuccessMessage({
+        title: "Subcategory Created Successfully!",
+        description: `The subcategory "${newSubCategory.name}" has been created successfully and is now available in your category hierarchy.`
+      })
+      setSuccessDialogOpen(true)
+      
+      // Also show toast notification
       toast({
         title: "Subcategory Created",
         description: `Successfully created subcategory "${newSubCategory.name}".`,
@@ -464,7 +500,9 @@ export function CategoriesManagement() {
     setSubCategoryForm({
       name: "",
       description: "",
+      slug: "",
       categoryId: "",
+      imageUrl: "",
       isActive: true,
       sortOrder: 0
     })
@@ -505,7 +543,9 @@ export function CategoriesManagement() {
     setSubCategoryForm({
       name: subCategory.name,
       description: subCategory.description || "",
+      slug: subCategory.slug || "",
       categoryId: subCategory.categoryId,
+      imageUrl: subCategory.imageUrl || "",
       isActive: subCategory.isActive,
       sortOrder: subCategory.sortOrder
     })
@@ -526,9 +566,15 @@ export function CategoriesManagement() {
 
   const openAddSubCategory = (categoryId: string) => {
     setSelectedCategoryForSub(categoryId)
+    // Set the form with the selected category ID pre-populated
     setSubCategoryForm({
-      ...subCategoryForm,
-      categoryId
+      name: "",
+      description: "",
+      slug: "",
+      categoryId: categoryId, // This will auto-populate the Parent Category field
+      imageUrl: "",
+      isActive: true,
+      sortOrder: 0
     })
     setIsAddSubCategoryOpen(true)
   }
@@ -736,7 +782,7 @@ export function CategoriesManagement() {
                 </TableHeader>
                 <TableBody>
                   {filteredCategories.map((category) => (
-                    <TableRow key={category.id} className="group hover:bg-muted/30 transition-colors border-b border-border/40">
+                    <TableRow key={category.categoryId} className="group hover:bg-muted/30 transition-colors border-b border-border/40">
                       <TableCell className="font-medium py-3">
                         <div className="flex items-center gap-3">
                           <div className="relative">
@@ -820,7 +866,7 @@ export function CategoriesManagement() {
                             size="sm" 
                             variant="ghost" 
                             className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-100 hover:text-green-600"
-                            onClick={() => openAddSubCategory(category.id)}
+                            onClick={() => openAddSubCategory(category.categoryId)}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -845,14 +891,14 @@ export function CategoriesManagement() {
                                 <span>Edit Category</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => openAddSubCategory(category.id)}
+                                onClick={() => openAddSubCategory(category.categoryId)}
                                 className="cursor-pointer hover:bg-green-50 focus:bg-green-50"
                               >
                                 <Plus className="h-4 w-4 mr-2 text-green-600" />
                                 <span>Add Subcategory</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => confirmDelete('category', category.id, category.name)}
+                                onClick={() => confirmDelete('category', category.categoryId, category.name)}
                                 className="cursor-pointer text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-600"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
@@ -982,7 +1028,7 @@ export function CategoriesManagement() {
           <SelectContent className="z-50"> {/* make dropdown appear on top */}
             <SelectItem value="none">No Parent (Root Category)</SelectItem>
             {categories.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id}>
+              <SelectItem key={cat.categoryId} value={cat.categoryId}>
                 {cat.name}
               </SelectItem>
             ))}
@@ -1155,8 +1201,8 @@ export function CategoriesManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Parent (Root Category)</SelectItem>
-                      {categories.filter(cat => cat.id !== editingCategory?.id).map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
+                      {categories.filter(cat => cat.categoryId !== editingCategory?.categoryId).map((cat) => (
+                        <SelectItem key={cat.categoryId} value={cat.categoryId}>
                           {cat.name}
                         </SelectItem>
                       ))}
@@ -1253,34 +1299,212 @@ export function CategoriesManagement() {
 
       {/* Add Subcategory Dialog */}
       <Dialog open={isAddSubCategoryOpen} onOpenChange={setIsAddSubCategoryOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Subcategory</DialogTitle>
-            <DialogDescription>
-              Create a new subcategory under the selected category.
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-xl">Add New Subcategory</DialogTitle>
+            <DialogDescription className="text-base">
+              Create a new subcategory under the selected category. Fill in the required fields.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="subcategory-name">Subcategory Name *</Label>
-              <Input
-                id="subcategory-name"
-                value={subCategoryForm.name}
-                onChange={(e) => setSubCategoryForm({ ...subCategoryForm, name: e.target.value })}
-                placeholder="Enter subcategory name"
-              />
+          
+          <div className="space-y-6 py-2">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Basic Information
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="subcategory-name" className="text-sm font-medium">
+                    Subcategory Name *
+                  </Label>
+                  <Input
+                    id="subcategory-name"
+                    value={subCategoryForm.name}
+                    onChange={(e) =>
+                      setSubCategoryForm({ ...subCategoryForm, name: e.target.value })
+                    }
+                    placeholder="Enter subcategory name"
+                    className="h-10"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="subcategory-slug" className="text-sm font-medium">
+                    Slug
+                  </Label>
+                  <Input
+                    id="subcategory-slug"
+                    value={subCategoryForm.slug || ""}
+                    onChange={(e) =>
+                      setSubCategoryForm({ ...subCategoryForm, slug: e.target.value })
+                    }
+                    placeholder="Auto-generated if empty"
+                    className="h-10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor="subcategory-description"
+                  className="text-sm font-medium"
+                >
+                  Description
+                </Label>
+                <Textarea
+                  id="subcategory-description"
+                  value={subCategoryForm.description || ""}
+                  onChange={(e) =>
+                    setSubCategoryForm({
+                      ...subCategoryForm,
+                      description: e.target.value,
+                    })
+                  }
+                  placeholder="Enter subcategory description"
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="subcategory-description">Description</Label>
-              <Input
-                id="subcategory-description"
-                value={subCategoryForm.description}
-                onChange={(e) => setSubCategoryForm({ ...subCategoryForm, description: e.target.value })}
-                placeholder="Enter subcategory description"
-              />
+
+            {/* Hierarchy & Order */}
+            <div className="space-y-6">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Hierarchy & Order
+              </h4>
+
+              <div className="grid grid-cols-1 gap-6">
+                {/* Parent Category */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Parent Category *</Label>
+                  {selectedCategoryForSub ? (
+                    // Auto-filled when opened from specific category
+                    <div className="p-3 rounded-md bg-muted/30 text-sm font-medium flex items-center justify-between">
+                      <span>
+                        {categories.find((cat) => cat.categoryId === selectedCategoryForSub)
+                          ?.name || "Unknown Category"}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        Auto-assigned
+                      </Badge>
+                    </div>
+                  ) : (
+                    // Manual selection when opened from main button
+                    <div className="space-y-2">
+                      <Select
+                        value={subCategoryForm.categoryId}
+                        onValueChange={(value) => {
+                          console.log('Parent category selected:', value)
+                          setSubCategoryForm({ ...subCategoryForm, categoryId: value })
+                        }}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select parent category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.length > 0 ? (
+                            categories.map((category) => (
+                              <SelectItem key={category.categoryId} value={category.categoryId}>
+                                {category.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-categories" disabled>
+                              No categories available
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {/* Debug info for dropdown */}
+                      <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                        <div>Available categories: {categories.length}</div>
+                        <div>Categories: {categories.map(c => `${c.name}(${c.categoryId || c.id})`).join(', ')}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sort Order */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="subcategory-sort-order"
+                    className="text-sm font-medium"
+                  >
+                    Sort Order
+                  </Label>
+                  <Input
+                    id="subcategory-sort-order"
+                    type="number"
+                    value={subCategoryForm.sortOrder}
+                    onChange={(e) =>
+                      setSubCategoryForm({
+                        ...subCategoryForm,
+                        sortOrder: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="0"
+                    className="h-10 w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Media */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Media
+              </h4>
+              <div className="space-y-2">
+                <Label htmlFor="subcategory-image" className="text-sm font-medium">
+                  Image URL
+                </Label>
+                <Input
+                  id="subcategory-image"
+                  value={subCategoryForm.imageUrl || ""}
+                  onChange={(e) =>
+                    setSubCategoryForm({
+                      ...subCategoryForm,
+                      imageUrl: e.target.value,
+                    })
+                  }
+                  placeholder="https://example.com/image.jpg"
+                  className="h-10"
+                />
+              </div>
+            </div>
+
+            {/* Settings */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Settings
+              </h4>
+              <div className="flex items-center space-x-3 p-4 bg-muted/20 rounded-lg">
+                <Switch
+                  id="subcategory-active"
+                  checked={subCategoryForm.isActive}
+                  onCheckedChange={(checked) =>
+                    setSubCategoryForm({
+                      ...subCategoryForm,
+                      isActive: checked,
+                    })
+                  }
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="subcategory-active" className="text-sm font-medium">
+                    Active Subcategory
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable this subcategory for public use
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="outline" onClick={() => {
               setIsAddSubCategoryOpen(false)
               resetSubCategoryForm()
@@ -1288,7 +1512,28 @@ export function CategoriesManagement() {
             }}>
               Cancel
             </Button>
-            <Button onClick={handleCreateSubCategory} disabled={!subCategoryForm.name?.trim()}>
+            {/* Debug info */}
+            <div className="text-xs text-muted-foreground flex flex-col items-end bg-slate-100 p-2 rounded">
+              <div>Name: "{subCategoryForm.name}"</div>
+              <div>Name trimmed: "{subCategoryForm.name?.trim()}"</div>
+              <div>CategoryId: "{subCategoryForm.categoryId}"</div>
+              <div>SelectedCategoryForSub: "{selectedCategoryForSub}"</div>
+              <div>Name valid: {!!subCategoryForm.name?.trim()}</div>
+              <div>CategoryId valid: {!!subCategoryForm.categoryId}</div>
+              <div>Button should be enabled: {!(!subCategoryForm.name?.trim() || !subCategoryForm.categoryId)}</div>
+            </div>
+            <Button 
+              onClick={() => {
+                console.log('Create button clicked!', { 
+                  name: subCategoryForm.name, 
+                  categoryId: subCategoryForm.categoryId,
+                  formData: subCategoryForm
+                })
+                handleCreateSubCategory()
+              }} 
+              disabled={!subCategoryForm.name?.trim() || !subCategoryForm.categoryId}
+              className="min-w-[140px]"
+            >
               Create Subcategory
             </Button>
           </div>
@@ -1357,6 +1602,45 @@ export function CategoriesManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Success Dialog */}
+      <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-center space-y-3">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-green-100 p-3">
+                <svg 
+                  className="w-6 h-6 text-green-600" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M5 13l4 4L19 7" 
+                  />
+                </svg>
+              </div>
+            </div>
+            <DialogTitle className="text-xl text-green-700">
+              {successMessage?.title}
+            </DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground">
+              {successMessage?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center pt-2">
+            <Button 
+              onClick={() => setSuccessDialogOpen(false)}
+              className="bg-green-600 hover:bg-green-700 text-white min-w-[100px]"
+            >
+              Great!
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   )
