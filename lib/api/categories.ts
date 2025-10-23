@@ -376,14 +376,30 @@ export const categoriesService = {
   async createSubCategory(subCategoryData: CreateSubCategoryDto): Promise<SubCategory> {
     try {
       console.log('➕ CategoriesService: Creating subcategory:', subCategoryData.name)
+      console.log('📝 CategoriesService: Subcategory data:', subCategoryData)
       
       if (!subCategoryData.slug) {
         subCategoryData.slug = this.generateSlug(subCategoryData.name)
       }
       
-      const response = await apiClient.post<SubCategory>('/SubCategories', subCategoryData)
+      // Use the correct endpoint pattern from backend: /Categories/{categoryId}/subcategories
+      const response = await apiClient.post<any>(`/Categories/${subCategoryData.categoryId}/subcategories`, subCategoryData)
       
-      console.log('✅ CategoriesService: Subcategory created successfully:', response.id)
+      console.log('✅ CategoriesService: Raw subcategory create response:', response)
+      
+      // Handle wrapped API response structure
+      if (response && typeof response === 'object' && 'data' in response && 'success' in response) {
+        if (response.success && response.data) {
+          console.log('✅ CategoriesService: Subcategory created successfully:', response.data.id)
+          return response.data
+        } else {
+          console.error('❌ CategoriesService: API returned unsuccessful response:', response)
+          throw new Error(response.message || 'Failed to create subcategory')
+        }
+      }
+      
+      // Handle direct response (legacy format)
+      console.log('✅ CategoriesService: Subcategory created successfully (legacy format):', response.id)
       return response
     } catch (error) {
       console.error('💥 CategoriesService: Error creating subcategory:', error)

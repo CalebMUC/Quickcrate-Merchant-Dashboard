@@ -1,7 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import "./globals.css"
+import "../styles/globals.css"
 import { AuthProvider } from "@/lib/contexts/AuthContext"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Toaster } from "@/components/ui/toaster"

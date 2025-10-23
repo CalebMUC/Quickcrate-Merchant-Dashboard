@@ -698,6 +698,13 @@ public class PagedResultDto<T>
     public int PageSize { get; set; }
     public int TotalPages { get; set; }
 }
+
+public class CategoryHierarchySearchResultDto
+{
+    public List<CategoryResponseDto> Categories { get; set; } = new List<CategoryResponseDto>();
+    public List<SubCategoryResponseDto> SubCategories { get; set; } = new List<SubCategoryResponseDto>();
+    public List<SubSubCategoryResponseDto> SubSubCategories { get; set; } = new List<SubSubCategoryResponseDto>();
+}
 ```
 
 ---
@@ -1071,7 +1078,562 @@ public class CategoryService : ICategoryService
                 (excludeId == null || c.Id != excludeId));
     }
 
-    // Additional methods for SubCategories and Sub-SubCategories...
+    // SubCategories Methods
+    public async Task<List<SubCategoryResponseDto>> GetSubCategoriesAsync(
+        int categoryId, 
+        int merchantId)
+    {
+        var subCategories = await _context.SubCategories
+            .Where(sc => sc.CategoryId == categoryId && sc.MerchantId == merchantId)
+            .Include(sc => sc.SubSubCategories)
+            .OrderBy(sc => sc.SortOrder)
+            .ThenBy(sc => sc.Name)
+            .ToListAsync();
+
+        _logger.LogInformation(
+            "SubCategories retrieved for Category: {CategoryId}, Merchant: {MerchantId}, Count: {Count}", 
+            categoryId, merchantId, subCategories.Count);
+
+        return _mapper.Map<List<SubCategoryResponseDto>>(subCategories);
+    }
+
+    public async Task<SubCategoryResponseDto> GetSubCategoryByIdAsync(
+        int id, 
+        int merchantId)
+    {
+        var subCategory = await _context.SubCategories
+            .Include(sc => sc.SubSubCategories)
+            .Include(sc => sc.Category)
+            .FirstOrDefaultAsync(sc => sc.Id == id && sc.MerchantId == merchantId);
+
+        if (subCategory == null)
+        {
+            throw new NotFoundException($"SubCategory with ID {id} not found.");
+        }
+
+        _logger.LogInformation(
+            "SubCategory retrieved: {SubCategoryId} for merchant {MerchantId}", 
+            id, merchantId);
+
+        return _mapper.Map<SubCategoryResponseDto>(subCategory);
+    }
+
+    public async Task<SubCategoryResponseDto> CreateSubCategoryAsync(
+        int categoryId, 
+        CreateSubCategoryDto dto, 
+        int merchantId, 
+        string userId)
+    {
+        // Verify category exists and belongs to merchant
+        var category = await _context.Categories
+            .FirstOrDefaultAsync(c => c.Id == categoryId && c.MerchantId == merchantId);
+
+        if (category == null)
+        {
+            throw new NotFoundException($"Category with ID {categoryId} not found.");
+        }
+
+        // Generate slug if not provided
+        var slug = !string.IsNullOrEmpty(dto.Slug) 
+            ? dto.Slug.ToLowerInvariant()
+            : GenerateSlug(dto.Name);
+
+        // Ensure slug is unique within merchant scope
+        slug = await EnsureUniqueSubCategorySlugAsync(slug, merchantId);
+
+        var subCategory = new SubCategory
+        {
+            Name = dto.Name,
+            Description = dto.Description,
+            Slug = slug,
+            IsActive = dto.IsActive,
+            SortOrder = dto.SortOrder,
+            CategoryId = categoryId,
+            MerchantId = merchantId,
+            ImageUrl = dto.ImageUrl,
+            CreatedBy = userId,
+            CreatedOn = DateTime.UtcNow
+        };
+
+        _context.SubCategories.Add(subCategory);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "SubCategory created: {SubCategoryId} under Category {CategoryId} by {UserId}", 
+            subCategory.Id, categoryId, userId);
+
+        return _mapper.Map<SubCategoryResponseDto>(subCategory);
+    }
+
+    public async Task<SubCategoryResponseDto> UpdateSubCategoryAsync(
+        int id, 
+        UpdateSubCategoryDto dto, 
+        int merchantId, 
+        string userId)
+    {
+        var subCategory = await _context.SubCategories
+            .FirstOrDefaultAsync(sc => sc.Id == id && sc.MerchantId == merchantId);
+
+        if (subCategory == null)
+        {
+            throw new NotFoundException($"SubCategory with ID {id} not found.");
+        }
+
+        // Update fields
+        if (!string.IsNullOrEmpty(dto.Name))
+            subCategory.Name = dto.Name;
+
+        if (dto.Description != null)
+            subCategory.Description = dto.Description;
+
+        if (!string.IsNullOrEmpty(dto.Slug))
+        {
+            var slug = dto.Slug.ToLowerInvariant();
+            if (slug != subCategory.Slug)
+            {
+                subCategory.Slug = await EnsureUniqueSubCategorySlugAsync(slug, merchantId, id);
+            }
+        }
+
+        if (dto.IsActive.HasValue)
+            subCategory.IsActive = dto.IsActive.Value;
+
+        if (dto.SortOrder.HasValue)
+            subCategory.SortOrder = dto.SortOrder.Value;
+
+        if (dto.CategoryId.HasValue)
+        {
+            // Verify new category exists and belongs to merchant
+            var newCategory = await _context.Categories
+                .FirstOrDefaultAsync(c => c.Id == dto.CategoryId.Value && c.MerchantId == merchantId);
+
+            if (newCategory == null)
+            {
+                throw new NotFoundException($"Category with ID {dto.CategoryId.Value} not found.");
+            }
+
+            subCategory.CategoryId = dto.CategoryId.Value;
+        }
+
+        if (dto.ImageUrl != null)
+            subCategory.ImageUrl = dto.ImageUrl;
+
+        subCategory.UpdatedBy = userId;
+        subCategory.UpdatedOn = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "SubCategory updated: {SubCategoryId} by {UserId}", 
+            subCategory.Id, userId);
+
+        return _mapper.Map<SubCategoryResponseDto>(subCategory);
+    }
+
+    public async Task DeleteSubCategoryAsync(int id, int merchantId)
+    {
+        var subCategory = await _context.SubCategories
+            .Include(sc => sc.SubSubCategories)
+            .Include(sc => sc.Products)
+            .FirstOrDefaultAsync(sc => sc.Id == id && sc.MerchantId == merchantId);
+
+        if (subCategory == null)
+        {
+            throw new NotFoundException($"SubCategory with ID {id} not found.");
+        }
+
+        // Check if subcategory has products
+        if (subCategory.Products.Any())
+        {
+            throw new BadRequestException(
+                "Cannot delete subcategory with associated products. " +
+                "Please move or delete products first.");
+        }
+
+        // Check if subcategory has sub-subcategories
+        if (subCategory.SubSubCategories.Any())
+        {
+            throw new BadRequestException(
+                "Cannot delete subcategory with sub-subcategories. " +
+                "Please delete sub-subcategories first.");
+        }
+
+        _context.SubCategories.Remove(subCategory);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "SubCategory deleted: {SubCategoryId}", subCategory.Id);
+    }
+
+    // Sub-SubCategories Methods
+    public async Task<List<SubSubCategoryResponseDto>> GetSubSubCategoriesAsync(
+        int subCategoryId, 
+        int merchantId)
+    {
+        var subSubCategories = await _context.SubSubCategories
+            .Where(ssc => ssc.SubCategoryId == subCategoryId && ssc.MerchantId == merchantId)
+            .OrderBy(ssc => ssc.SortOrder)
+            .ThenBy(ssc => ssc.Name)
+            .ToListAsync();
+
+        _logger.LogInformation(
+            "SubSubCategories retrieved for SubCategory: {SubCategoryId}, Merchant: {MerchantId}, Count: {Count}", 
+            subCategoryId, merchantId, subSubCategories.Count);
+
+        return _mapper.Map<List<SubSubCategoryResponseDto>>(subSubCategories);
+    }
+
+    public async Task<SubSubCategoryResponseDto> GetSubSubCategoryByIdAsync(
+        int id, 
+        int merchantId)
+    {
+        var subSubCategory = await _context.SubSubCategories
+            .Include(ssc => ssc.SubCategory)
+                .ThenInclude(sc => sc.Category)
+            .FirstOrDefaultAsync(ssc => ssc.Id == id && ssc.MerchantId == merchantId);
+
+        if (subSubCategory == null)
+        {
+            throw new NotFoundException($"SubSubCategory with ID {id} not found.");
+        }
+
+        _logger.LogInformation(
+            "SubSubCategory retrieved: {SubSubCategoryId} for merchant {MerchantId}", 
+            id, merchantId);
+
+        return _mapper.Map<SubSubCategoryResponseDto>(subSubCategory);
+    }
+
+    public async Task<SubSubCategoryResponseDto> CreateSubSubCategoryAsync(
+        int subCategoryId, 
+        CreateSubSubCategoryDto dto, 
+        int merchantId, 
+        string userId)
+    {
+        // Verify subcategory exists and belongs to merchant
+        var subCategory = await _context.SubCategories
+            .FirstOrDefaultAsync(sc => sc.Id == subCategoryId && sc.MerchantId == merchantId);
+
+        if (subCategory == null)
+        {
+            throw new NotFoundException($"SubCategory with ID {subCategoryId} not found.");
+        }
+
+        // Generate slug if not provided
+        var slug = !string.IsNullOrEmpty(dto.Slug) 
+            ? dto.Slug.ToLowerInvariant()
+            : GenerateSlug(dto.Name);
+
+        // Ensure slug is unique within merchant scope
+        slug = await EnsureUniqueSubSubCategorySlugAsync(slug, merchantId);
+
+        var subSubCategory = new SubSubCategory
+        {
+            Name = dto.Name,
+            Description = dto.Description,
+            Slug = slug,
+            IsActive = dto.IsActive,
+            SortOrder = dto.SortOrder,
+            SubCategoryId = subCategoryId,
+            MerchantId = merchantId,
+            ImageUrl = dto.ImageUrl,
+            CreatedBy = userId,
+            CreatedOn = DateTime.UtcNow
+        };
+
+        _context.SubSubCategories.Add(subSubCategory);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "SubSubCategory created: {SubSubCategoryId} under SubCategory {SubCategoryId} by {UserId}", 
+            subSubCategory.Id, subCategoryId, userId);
+
+        return _mapper.Map<SubSubCategoryResponseDto>(subSubCategory);
+    }
+
+    public async Task<SubSubCategoryResponseDto> UpdateSubSubCategoryAsync(
+        int id, 
+        UpdateSubSubCategoryDto dto, 
+        int merchantId, 
+        string userId)
+    {
+        var subSubCategory = await _context.SubSubCategories
+            .FirstOrDefaultAsync(ssc => ssc.Id == id && ssc.MerchantId == merchantId);
+
+        if (subSubCategory == null)
+        {
+            throw new NotFoundException($"SubSubCategory with ID {id} not found.");
+        }
+
+        // Update fields
+        if (!string.IsNullOrEmpty(dto.Name))
+            subSubCategory.Name = dto.Name;
+
+        if (dto.Description != null)
+            subSubCategory.Description = dto.Description;
+
+        if (!string.IsNullOrEmpty(dto.Slug))
+        {
+            var slug = dto.Slug.ToLowerInvariant();
+            if (slug != subSubCategory.Slug)
+            {
+                subSubCategory.Slug = await EnsureUniqueSubSubCategorySlugAsync(slug, merchantId, id);
+            }
+        }
+
+        if (dto.IsActive.HasValue)
+            subSubCategory.IsActive = dto.IsActive.Value;
+
+        if (dto.SortOrder.HasValue)
+            subSubCategory.SortOrder = dto.SortOrder.Value;
+
+        if (dto.SubCategoryId.HasValue)
+        {
+            // Verify new subcategory exists and belongs to merchant
+            var newSubCategory = await _context.SubCategories
+                .FirstOrDefaultAsync(sc => sc.Id == dto.SubCategoryId.Value && sc.MerchantId == merchantId);
+
+            if (newSubCategory == null)
+            {
+                throw new NotFoundException($"SubCategory with ID {dto.SubCategoryId.Value} not found.");
+            }
+
+            subSubCategory.SubCategoryId = dto.SubCategoryId.Value;
+        }
+
+        if (dto.ImageUrl != null)
+            subSubCategory.ImageUrl = dto.ImageUrl;
+
+        subSubCategory.UpdatedBy = userId;
+        subSubCategory.UpdatedOn = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "SubSubCategory updated: {SubSubCategoryId} by {UserId}", 
+            subSubCategory.Id, userId);
+
+        return _mapper.Map<SubSubCategoryResponseDto>(subSubCategory);
+    }
+
+    public async Task DeleteSubSubCategoryAsync(int id, int merchantId)
+    {
+        var subSubCategory = await _context.SubSubCategories
+            .Include(ssc => ssc.Products)
+            .FirstOrDefaultAsync(ssc => ssc.Id == id && ssc.MerchantId == merchantId);
+
+        if (subSubCategory == null)
+        {
+            throw new NotFoundException($"SubSubCategory with ID {id} not found.");
+        }
+
+        // Check if sub-subcategory has products
+        if (subSubCategory.Products.Any())
+        {
+            throw new BadRequestException(
+                "Cannot delete sub-subcategory with associated products. " +
+                "Please move or delete products first.");
+        }
+
+        _context.SubSubCategories.Remove(subSubCategory);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "SubSubCategory deleted: {SubSubCategoryId}", subSubCategory.Id);
+    }
+
+    // Product Count Maintenance
+    public async Task UpdateProductCountsAsync(int merchantId)
+    {
+        // Update SubSubCategory product counts
+        var subSubCategories = await _context.SubSubCategories
+            .Where(ssc => ssc.MerchantId == merchantId)
+            .ToListAsync();
+
+        foreach (var ssc in subSubCategories)
+        {
+            var productCount = await _context.Products
+                .CountAsync(p => p.SubSubCategoryId == ssc.Id && p.IsActive);
+            
+            ssc.ProductCount = productCount;
+        }
+
+        // Update SubCategory product counts (including sub-subcategory products)
+        var subCategories = await _context.SubCategories
+            .Where(sc => sc.MerchantId == merchantId)
+            .Include(sc => sc.SubSubCategories)
+            .ToListAsync();
+
+        foreach (var sc in subCategories)
+        {
+            var directProductCount = await _context.Products
+                .CountAsync(p => p.SubCategoryId == sc.Id && p.IsActive);
+            
+            var subSubProductCount = sc.SubSubCategories.Sum(ssc => ssc.ProductCount);
+            
+            sc.ProductCount = directProductCount + subSubProductCount;
+        }
+
+        // Update Category product counts (including subcategory and sub-subcategory products)
+        var categories = await _context.Categories
+            .Where(c => c.MerchantId == merchantId)
+            .Include(c => c.SubCategories)
+                .ThenInclude(sc => sc.SubSubCategories)
+            .ToListAsync();
+
+        foreach (var c in categories)
+        {
+            var directProductCount = await _context.Products
+                .CountAsync(p => p.CategoryId == c.Id && p.IsActive);
+            
+            var subCategoryProductCount = c.SubCategories.Sum(sc => sc.ProductCount);
+            
+            c.ProductCount = directProductCount + subCategoryProductCount;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Product counts updated for merchant {MerchantId}", merchantId);
+    }
+
+    // Helper methods for slug uniqueness
+    private async Task<string> EnsureUniqueSubCategorySlugAsync(
+        string baseSlug, 
+        int merchantId, 
+        int? excludeId = null)
+    {
+        var slug = baseSlug;
+        var counter = 1;
+
+        while (await SubCategorySlugExistsAsync(slug, merchantId, excludeId))
+        {
+            slug = $"{baseSlug}-{counter}";
+            counter++;
+        }
+
+        return slug;
+    }
+
+    private async Task<bool> SubCategorySlugExistsAsync(
+        string slug, 
+        int merchantId, 
+        int? excludeId = null)
+    {
+        return await _context.SubCategories
+            .AnyAsync(sc => 
+                sc.Slug == slug && 
+                sc.MerchantId == merchantId && 
+                (excludeId == null || sc.Id != excludeId));
+    }
+
+    private async Task<string> EnsureUniqueSubSubCategorySlugAsync(
+        string baseSlug, 
+        int merchantId, 
+        int? excludeId = null)
+    {
+        var slug = baseSlug;
+        var counter = 1;
+
+        while (await SubSubCategorySlugExistsAsync(slug, merchantId, excludeId))
+        {
+            slug = $"{baseSlug}-{counter}";
+            counter++;
+        }
+
+        return slug;
+    }
+
+    private async Task<bool> SubSubCategorySlugExistsAsync(
+        string slug, 
+        int merchantId, 
+        int? excludeId = null)
+    {
+        return await _context.SubSubCategories
+            .AnyAsync(ssc => 
+                ssc.Slug == slug && 
+                ssc.MerchantId == merchantId && 
+                (excludeId == null || ssc.Id != excludeId));
+    }
+
+    // Bulk operations for better performance
+    public async Task<List<SubCategoryResponseDto>> GetSubCategoriesByCategoryIdsAsync(
+        List<int> categoryIds, 
+        int merchantId)
+    {
+        var subCategories = await _context.SubCategories
+            .Where(sc => categoryIds.Contains(sc.CategoryId) && sc.MerchantId == merchantId)
+            .Include(sc => sc.SubSubCategories)
+            .OrderBy(sc => sc.CategoryId)
+            .ThenBy(sc => sc.SortOrder)
+            .ThenBy(sc => sc.Name)
+            .ToListAsync();
+
+        return _mapper.Map<List<SubCategoryResponseDto>>(subCategories);
+    }
+
+    public async Task<List<SubSubCategoryResponseDto>> GetSubSubCategoriesBySubCategoryIdsAsync(
+        List<int> subCategoryIds, 
+        int merchantId)
+    {
+        var subSubCategories = await _context.SubSubCategories
+            .Where(ssc => subCategoryIds.Contains(ssc.SubCategoryId) && ssc.MerchantId == merchantId)
+            .OrderBy(ssc => ssc.SubCategoryId)
+            .ThenBy(ssc => ssc.SortOrder)
+            .ThenBy(ssc => ssc.Name)
+            .ToListAsync();
+
+        return _mapper.Map<List<SubSubCategoryResponseDto>>(subSubCategories);
+    }
+
+    // Search across all category levels
+    public async Task<CategoryHierarchySearchResultDto> SearchCategoriesAsync(
+        string searchTerm, 
+        int merchantId, 
+        int maxResults = 50)
+    {
+        var result = new CategoryHierarchySearchResultDto();
+
+        if (string.IsNullOrWhiteSpace(searchTerm))
+            return result;
+
+        var searchLower = searchTerm.ToLowerInvariant();
+
+        // Search Categories
+        result.Categories = await _context.Categories
+            .Where(c => c.MerchantId == merchantId && 
+                       (c.Name.ToLower().Contains(searchLower) || 
+                        c.Description.ToLower().Contains(searchLower)))
+            .OrderBy(c => c.Name)
+            .Take(maxResults)
+            .Select(c => _mapper.Map<CategoryResponseDto>(c))
+            .ToListAsync();
+
+        // Search SubCategories
+        result.SubCategories = await _context.SubCategories
+            .Where(sc => sc.MerchantId == merchantId && 
+                        (sc.Name.ToLower().Contains(searchLower) || 
+                         sc.Description.ToLower().Contains(searchLower)))
+            .Include(sc => sc.Category)
+            .OrderBy(sc => sc.Name)
+            .Take(maxResults)
+            .Select(sc => _mapper.Map<SubCategoryResponseDto>(sc))
+            .ToListAsync();
+
+        // Search SubSubCategories
+        result.SubSubCategories = await _context.SubSubCategories
+            .Where(ssc => ssc.MerchantId == merchantId && 
+                         (ssc.Name.ToLower().Contains(searchLower) || 
+                          ssc.Description.ToLower().Contains(searchLower)))
+            .Include(ssc => ssc.SubCategory)
+                .ThenInclude(sc => sc.Category)
+            .OrderBy(ssc => ssc.Name)
+            .Take(maxResults)
+            .Select(ssc => _mapper.Map<SubSubCategoryResponseDto>(ssc))
+            .ToListAsync();
+
+        return result;
+    }
 }
 ```
 
