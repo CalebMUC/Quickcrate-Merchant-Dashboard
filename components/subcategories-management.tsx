@@ -322,22 +322,18 @@ export function SubcategoriesManagement() {
       </div>
 
       {/* Search Section */}
-      {/* <Card>
-        <CardContent className="p-4"> */}
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search subcategories..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-            <Button onClick={handleSearch} variant="outline">
-              Search
-            </Button>
-          </div>
-        {/* </CardContent>
-      </Card> */}
+      <div className="flex items-center gap-2">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search subcategories..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1"
+        />
+        <Button onClick={handleSearch} variant="outline">
+          Search
+        </Button>
+      </div>
 
       {/* Error State */}
       {error && (
@@ -349,34 +345,22 @@ export function SubcategoriesManagement() {
 
       {/* Loading State */}
       {loading && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <Skeleton className="h-12 w-12 rounded-full" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
-                  </div>
-                </div>
-              ))}
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center space-x-4">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[250px]" />
+                <Skeleton className="h-4 w-[200px]" />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       )}
 
       {/* Subcategories Table */}
       {!loading && filteredSubcategories.length > 0 && (
-        // <Card>
-        //   <CardHeader>
-        //     <CardTitle>Subcategories</CardTitle>
-        //     <CardDescription>
-        //       Manage your product subcategories and their parent categories
-        //     </CardDescription>
-        //   </CardHeader>
-          // <CardContent>
-            <Table>
+        <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -451,27 +435,23 @@ export function SubcategoriesManagement() {
                 ))}
               </TableBody>
             </Table>
-          {/* </CardContent>
-        </Card> */}
       )}
 
       {/* Empty State */}
       {!loading && filteredSubcategories.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Folder className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No subcategories found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm ? 'No subcategories match your search criteria.' : 'Create your first subcategory to get started.'}
-            </p>
-            {!searchTerm && (
-              <Button onClick={() => setIsAddSubCategoryOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add First Subcategory
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        <div className="text-center py-12">
+          <Folder className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No subcategories found</h3>
+          <p className="text-muted-foreground mb-4">
+            {searchTerm ? 'No subcategories match your search criteria.' : 'Create your first subcategory to get started.'}
+          </p>
+          {!searchTerm && (
+            <Button onClick={() => setIsAddSubCategoryOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Subcategory
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Add Subcategory Dialog */}
