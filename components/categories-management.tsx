@@ -616,88 +616,46 @@ export function CategoriesManagement() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-sm">
-                <Tag className="h-5 w-5 text-white" />
-              </div>
-              {/* <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                  Categories Management
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  Organize your products with a comprehensive category hierarchy
-                </p>
-              </div> */}
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleRefresh} 
-              disabled={refreshing}
-              className="hover:bg-muted/80 transition-colors"
-            >
-              {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Refresh
-            </Button>
-            
-            <Button 
-              onClick={() => setIsAddCategoryOpen(true)} 
-              size="sm"
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm transition-all duration-200 hover:shadow-md"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Category
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Categories Management</h2>
+          <p className="text-muted-foreground">
+            Organize your products with a comprehensive category hierarchy.
+          </p>
         </div>
-
-      {/* Search and Filters Section */}
-      {/* <Card className="shadow-sm border-0 bg-muted/30">
-         <CardContent className="p-4"> */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search categories by name or description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-9 bg-background/50 border-muted focus:bg-background transition-colors"
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-            <Button 
-              onClick={handleSearch} 
-              variant="secondary" 
-              size="sm"
-              className="sm:w-auto w-full h-9"
-            >
-              Search
-            </Button>
-            {searchTerm && (
-              <Button 
-                onClick={() => setSearchTerm('')} 
-                variant="ghost" 
-                size="sm"
-                className="sm:w-auto w-full h-9 text-muted-foreground"
-              >
-                Clear
-              </Button>
+        
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
             )}
-          </div>
-        {/* </CardContent>
-      </Card>  */}
+            Refresh
+          </Button>
+          
+          <Button onClick={() => setIsAddCategoryOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>
+        </div>
+      </div>
+
+      {/* Search Section */}
+      <div className="flex items-center gap-2">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search categories..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1"
+        />
+        <Button onClick={handleSearch} variant="outline">
+          Search
+        </Button>
+      </div>
 
       {/* Error State */}
       {error && (
@@ -709,64 +667,22 @@ export function CategoriesManagement() {
 
       {/* Loading State */}
       {loading && (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-64 mt-2" />
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="space-y-1">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4 p-4 border-b last:border-b-0">
-                  <Skeleton className="h-6 w-6 rounded-full" />
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-6 w-16 rounded-full" />
-                  <Skeleton className="h-4 w-12" />
-                  <Skeleton className="h-6 w-12 rounded-full" />
-                  <Skeleton className="h-6 w-12 rounded-full" />
-                  <Skeleton className="h-8 w-8 rounded" />
-                </div>
-              ))}
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center space-x-4">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[250px]" />
+                <Skeleton className="h-4 w-[200px]" />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       )}
 
       {/* Categories Table */}
       {!loading && filteredCategories.length > 0 && (
-        <Card className="shadow-lg border-0 bg-card/50 backdrop-blur-sm">
-          <CardHeader className="pb-4 bg-gradient-to-r from-card to-card/80 border-b border-border/50">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="space-y-1">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    Categories
-                  </span>
-                  <Badge variant="secondary" className="text-xs font-medium">
-                    {filteredCategories.length}
-                  </Badge>
-                </CardTitle>
-                <CardDescription className="text-sm">
-                  Manage your product categories and their hierarchy
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <span>{filteredCategories.filter(cat => cat.isActive).length} active</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                  <span>{filteredCategories.filter(cat => !cat.isActive).length} inactive</span>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
+        <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="font-semibold">Name</TableHead>
@@ -912,45 +828,23 @@ export function CategoriesManagement() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {/* Empty State */}
       {!loading && filteredCategories.length === 0 && (
-        <Card className="shadow-sm">
-          <CardContent className="text-center py-16">
-            <div className="flex flex-col items-center justify-center">
-              <div className="bg-muted rounded-full p-6 mb-6">
-                <Tag className="h-12 w-12 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">
-                {searchTerm ? 'No categories match your search' : 'No categories found'}
-              </h3>
-              <p className="text-muted-foreground mb-6 max-w-md">
-                {searchTerm 
-                  ? `No categories match "${searchTerm}". Try adjusting your search terms.`
-                  : 'Get started by creating your first product category to organize your inventory.'
-                }
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                {searchTerm && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setSearchTerm('')}
-                  >
-                    Clear Search
-                  </Button>
-                )}
-                <Button onClick={() => setIsAddCategoryOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {searchTerm ? 'Add Category' : 'Add First Category'}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="text-center py-12">
+          <Tag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No categories found</h3>
+          <p className="text-muted-foreground mb-4">
+            {searchTerm ? 'No categories match your search criteria.' : 'Create your first category to get started.'}
+          </p>
+          {!searchTerm && (
+            <Button onClick={() => setIsAddCategoryOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Category
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Add Category Dialog */}
@@ -1641,7 +1535,6 @@ export function CategoriesManagement() {
           </div>
         </DialogContent>
       </Dialog>
-      </div>
     </div>
   )
 }
