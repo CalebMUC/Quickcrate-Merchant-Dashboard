@@ -1,0 +1,503 @@
+import { LoginRequest, LoginResponse, User, Product, Order, Transaction, SupportTicket, SupportMessage } from '@/types';
+
+// Mock data
+const mockUser: User = {
+  id: 'user-1',
+  email: 'admin@quickcrate.com',
+  name: 'John Merchant',
+  role: 'merchant',
+  avatar: '/avatars/john.jpg',
+  merchantId: 'merchant-1',
+  permissions: ['products.read', 'products.write', 'orders.read', 'orders.write', 'payments.read'],
+};
+
+const mockProducts: Product[] = [
+  {
+    id: 'PRD-001',
+    name: 'Wireless Bluetooth Headphones',
+    description: 'High-quality wireless headphones with noise cancellation',
+    category: 'Electronics',
+    price: 129.99,
+    stock: 45,
+    status: 'approved',
+    image: '/products/headphones.jpg',
+    rating: 4.5,
+    sales: 234,
+    createdAt: '2024-01-15T10:00:00Z',
+    updatedAt: '2024-01-15T10:00:00Z',
+  },
+  {
+    id: 'PRD-002',
+    name: 'Cotton T-Shirt',
+    description: 'Comfortable cotton t-shirt available in multiple colors',
+    category: 'Clothing',
+    price: 24.99,
+    stock: 120,
+    status: 'pending',
+    image: '/products/tshirt.jpg',
+    rating: 4.2,
+    sales: 156,
+    createdAt: '2024-01-14T10:00:00Z',
+    updatedAt: '2024-01-14T10:00:00Z',
+  },
+  {
+    id: 'PRD-003',
+    name: 'Smart Watch',
+    description: 'Feature-rich smartwatch with health monitoring',
+    category: 'Electronics',
+    price: 299.99,
+    stock: 8,
+    status: 'approved',
+    image: '/products/smartwatch.jpg',
+    rating: 4.8,
+    sales: 89,
+    createdAt: '2024-01-13T10:00:00Z',
+    updatedAt: '2024-01-13T10:00:00Z',
+  },
+];
+
+const mockOrders: Order[] = [
+  {
+    id: 'ORD-001',
+    customerId: 'cust-1',
+    customer: {
+      id: 'cust-1',
+      name: 'Sarah Johnson',
+      email: 'sarah@example.com',
+    },
+    items: [
+      {
+        id: 'item-1',
+        productId: 'PRD-001',
+        product: mockProducts[0],
+        quantity: 2,
+        price: 129.99,
+      },
+    ],
+    total: 259.98,
+    status: 'processing',
+    createdAt: '2024-01-16T10:30:00Z',
+    updatedAt: '2024-01-16T10:30:00Z',
+    shippingAddress: {
+      street: '123 Main St',
+      city: 'New York',
+      state: 'NY',
+      zipCode: '10001',
+      country: 'USA',
+    },
+  },
+  {
+    id: 'ORD-002',
+    customerId: 'cust-2',
+    customer: {
+      id: 'cust-2',
+      name: 'Mike Chen',
+      email: 'mike@example.com',
+    },
+    items: [
+      {
+        id: 'item-2',
+        productId: 'PRD-003',
+        product: mockProducts[2],
+        quantity: 1,
+        price: 299.99,
+      },
+    ],
+    total: 299.99,
+    status: 'shipped',
+    createdAt: '2024-01-15T14:20:00Z',
+    updatedAt: '2024-01-16T09:15:00Z',
+    shippingAddress: {
+      street: '456 Oak Ave',
+      city: 'Los Angeles',
+      state: 'CA',
+      zipCode: '90210',
+      country: 'USA',
+    },
+  },
+];
+
+// Simulate network delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+export const mockApiService = {
+  // Authentication
+  async login(credentials: LoginRequest): Promise<LoginResponse> {
+    console.log('Mock API: Login attempt with:', credentials.email);
+    await delay(1000);
+    
+    if (credentials.email === 'admin@quickcrate.com' && credentials.password === 'admin123') {
+      console.log('Mock API: Login successful');
+      return {
+        token: 'mock-jwt-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        user: mockUser,
+      };
+    }
+    
+    console.log('Mock API: Invalid credentials');
+    throw new Error('Invalid credentials');
+  },
+
+  async logout(): Promise<void> {
+    await delay(500);
+  },
+
+  async refreshToken(): Promise<LoginResponse> {
+    await delay(500);
+    return {
+      token: 'mock-jwt-token-' + Date.now(),
+      refreshToken: 'mock-refresh-token-' + Date.now(),
+      user: mockUser,
+    };
+  },
+
+  // Products
+  async getProducts(params?: any) {
+    await delay(800);
+    
+    let filteredProducts = [...mockProducts];
+    
+    if (params?.search) {
+      filteredProducts = filteredProducts.filter(p => 
+        p.name.toLowerCase().includes(params.search.toLowerCase())
+      );
+    }
+    
+    if (params?.category && params.category !== 'all') {
+      filteredProducts = filteredProducts.filter(p => p.category === params.category);
+    }
+    
+    if (params?.status && params.status !== 'all') {
+      filteredProducts = filteredProducts.filter(p => p.status === params.status);
+    }
+    
+    return {
+      data: filteredProducts,
+      pagination: {
+        page: params?.page || 1,
+        limit: params?.limit || 10,
+        total: filteredProducts.length,
+        totalPages: Math.ceil(filteredProducts.length / (params?.limit || 10)),
+      },
+    };
+  },
+
+  async getProduct(id: string): Promise<Product> {
+    await delay(500);
+    const product = mockProducts.find(p => p.id === id);
+    if (!product) throw new Error('Product not found');
+    return product;
+  },
+
+  async createProduct(data: any): Promise<Product> {
+    await delay(1000);
+    const newProduct: Product = {
+      id: 'PRD-' + Date.now(),
+      ...data,
+      status: 'pending' as const,
+      rating: 0,
+      sales: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    mockProducts.push(newProduct);
+    return newProduct;
+  },
+
+  async updateProduct(id: string, data: any): Promise<Product> {
+    await delay(800);
+    const index = mockProducts.findIndex(p => p.id === id);
+    if (index === -1) throw new Error('Product not found');
+    
+    mockProducts[index] = { ...mockProducts[index], ...data, updatedAt: new Date().toISOString() };
+    return mockProducts[index];
+  },
+
+  async deleteProduct(id: string): Promise<{ message: string }> {
+    await delay(500);
+    const index = mockProducts.findIndex(p => p.id === id);
+    if (index === -1) throw new Error('Product not found');
+    
+    mockProducts.splice(index, 1);
+    return { message: 'Product deleted successfully' };
+  },
+
+  async approveProduct(id: string): Promise<Product> {
+    return this.updateProduct(id, { status: 'approved' });
+  },
+
+  async rejectProduct(id: string): Promise<Product> {
+    return this.updateProduct(id, { status: 'rejected' });
+  },
+
+  // Dashboard metrics
+  async getDashboardMetrics() {
+    await delay(600);
+    return {
+      totalRevenue: 45231.89,
+      totalOrders: 1234,
+      totalProducts: mockProducts.length,
+      totalCustomers: 567,
+      revenueGrowth: 20.1,
+      ordersGrowth: 12.5,
+    };
+  },
+
+  // Notifications
+  async getNotifications() {
+    await delay(400);
+    return {
+      data: [
+        {
+          id: 'not-1',
+          title: 'New Order Received',
+          message: 'Order #ORD-001 from John Smith for $299.00',
+          type: 'order' as const,
+          isRead: false,
+          createdAt: '2024-01-16T10:00:00Z',
+        },
+        {
+          id: 'not-2',
+          title: 'Payment Processed',
+          message: 'Payment of $159.00 has been successfully processed',
+          type: 'payment' as const,
+          isRead: false,
+          createdAt: '2024-01-16T09:30:00Z',
+        },
+        {
+          id: 'not-3',
+          title: 'Low Stock Alert',
+          message: 'Wireless Headphones are running low (5 items left)',
+          type: 'inventory' as const,
+          isRead: true,
+          createdAt: '2024-01-16T08:00:00Z',
+        },
+      ],
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 3,
+        totalPages: 1,
+      },
+    };
+  },
+
+  async getUnreadNotificationsCount() {
+    await delay(200);
+    return { count: 3 };
+  },
+
+  // Analytics mock functions
+  async getDashboardAnalytics() {
+    await delay(500);
+    return {
+      metrics: {
+        totalRevenue: 45782.50,
+        totalOrders: 142,
+        totalProducts: 38,
+        totalCustomers: 89,
+        revenueGrowth: 12.5,
+        ordersGrowth: 8.3,
+      },
+      salesData: [
+        { date: '2024-01-10', revenue: 4520, orders: 12 },
+        { date: '2024-01-11', revenue: 3890, orders: 10 },
+        { date: '2024-01-12', revenue: 5230, orders: 15 },
+        { date: '2024-01-13', revenue: 4780, orders: 13 },
+        { date: '2024-01-14', revenue: 6120, orders: 18 },
+        { date: '2024-01-15', revenue: 5540, orders: 16 },
+        { date: '2024-01-16', revenue: 4890, orders: 14 },
+      ],
+      topProducts: mockProducts.slice(0, 5),
+      recentOrders: mockOrders.slice(0, 5),
+    };
+  },
+
+  async getSalesMetrics() {
+    await delay(300);
+    return {
+      revenue: 45782.50,
+      orders: 142,
+      growth: 12.5,
+      period: '30d',
+    };
+  },
+
+  async getTopProducts() {
+    await delay(400);
+    return mockProducts
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 10)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        sales: p.sales,
+        revenue: p.sales * p.price,
+        image: p.image,
+      }));
+  },
+
+  async getPaymentMethodsDistribution() {
+    await delay(300);
+    return [
+      { id: '1', type: 'credit_card' as const, name: 'Credit Card', last4: '4242', isPrimary: true, isActive: true },
+      { id: '2', type: 'paypal' as const, name: 'PayPal', isPrimary: false, isActive: true },
+      { id: '3', type: 'bank_account' as const, name: 'Bank Transfer', isPrimary: false, isActive: true },
+    ];
+  },
+
+  async getOrderStatusCounts() {
+    await delay(250);
+    return [
+      { status: 'pending', count: 23, percentage: 16.2 },
+      { status: 'processing', count: 45, percentage: 31.7 },
+      { status: 'shipped', count: 38, percentage: 26.8 },
+      { status: 'delivered', count: 32, percentage: 22.5 },
+      { status: 'cancelled', count: 4, percentage: 2.8 },
+    ];
+  },
+
+  async getRevenueTrends() {
+    await delay(400);
+    return [
+      { date: '2024-01-01', revenue: 3200, orders: 8, growth: 5.2 },
+      { date: '2024-01-02', revenue: 4100, orders: 11, growth: 8.1 },
+      { date: '2024-01-03', revenue: 3800, orders: 9, growth: -2.5 },
+      { date: '2024-01-04', revenue: 5200, orders: 14, growth: 15.3 },
+      { date: '2024-01-05', revenue: 4900, orders: 13, growth: 12.1 },
+      { date: '2024-01-06', revenue: 6100, orders: 16, growth: 24.5 },
+      { date: '2024-01-07', revenue: 5500, orders: 15, growth: 18.9 },
+    ];
+  },
+
+  async getCustomerMetrics() {
+    await delay(350);
+    return {
+      total: 89,
+      new: 15,
+      returning: 74,
+      growth: 8.3,
+    };
+  },
+
+  async getProductPerformance() {
+    await delay(450);
+    return mockProducts.slice(0, 8).map((p, index) => ({
+      id: p.id,
+      name: p.name,
+      views: Math.floor(Math.random() * 1000) + 100,
+      sales: p.sales,
+      conversionRate: Math.round((Math.random() * 15 + 2) * 100) / 100,
+      revenue: p.sales * p.price,
+    }));
+  },
+
+  // Support mock functions
+  async getSupportTickets() {
+    await delay(400);
+    const mockTickets = [
+      {
+        id: 'TKT-001',
+        subject: 'Payment Processing Issue',
+        description: 'Customer unable to complete payment for order #ORD-001',
+        status: 'open' as const,
+        priority: 'high' as const,
+        category: 'Payment',
+        createdAt: '2024-01-16T09:00:00Z',
+        updatedAt: '2024-01-16T09:00:00Z',
+        messages: [
+          {
+            id: 'msg-1',
+            content: 'Customer unable to complete payment for order #ORD-001',
+            sender: 'user' as const,
+            createdAt: '2024-01-16T09:00:00Z',
+          },
+        ],
+      },
+      {
+        id: 'TKT-002',
+        subject: 'Product Image Upload Problem',
+        description: 'Cannot upload product images - getting 500 error',
+        status: 'in-progress' as const,
+        priority: 'medium' as const,
+        category: 'Technical',
+        createdAt: '2024-01-15T14:30:00Z',
+        updatedAt: '2024-01-16T08:15:00Z',
+        messages: [
+          {
+            id: 'msg-2',
+            content: 'Cannot upload product images - getting 500 error',
+            sender: 'user' as const,
+            createdAt: '2024-01-15T14:30:00Z',
+          },
+          {
+            id: 'msg-3',
+            content: 'We are investigating this issue. Please try again in a few hours.',
+            sender: 'support' as const,
+            createdAt: '2024-01-16T08:15:00Z',
+          },
+        ],
+      },
+    ];
+
+    return {
+      data: mockTickets,
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: mockTickets.length,
+        totalPages: 1,
+      },
+    };
+  },
+
+  async getSupportTicket(id: string) {
+    await delay(300);
+    const tickets = await this.getSupportTickets();
+    const ticket = tickets.data.find(t => t.id === id);
+    if (!ticket) throw new Error('Ticket not found');
+    return ticket;
+  },
+
+  async createSupportTicket(data: any) {
+    await delay(600);
+    const newTicket = {
+      id: 'TKT-' + Date.now(),
+      ...data,
+      status: 'open' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          id: 'msg-' + Date.now(),
+          content: data.description,
+          sender: 'user' as const,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+    return newTicket;
+  },
+
+  async addSupportMessage(ticketId: string, content: string) {
+    await delay(400);
+    const newMessage = {
+      id: 'msg-' + Date.now(),
+      content,
+      sender: 'user' as const,
+      createdAt: new Date().toISOString(),
+    };
+    return newMessage;
+  },
+
+  async updateSupportTicketStatus(id: string, status: string) {
+    await delay(300);
+    const ticket = await this.getSupportTicket(id);
+    return {
+      ...ticket,
+      status: status as any,
+      updatedAt: new Date().toISOString(),
+    };
+  },
+};
