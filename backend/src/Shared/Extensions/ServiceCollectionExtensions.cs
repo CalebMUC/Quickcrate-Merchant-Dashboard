@@ -1,12 +1,12 @@
 using AutoMapper;
 using MerchantService.Data;
-using MerchantService.Shared.Mappings;
-using MerchantService.Shared.Services;
+using MerchantService.Mappings;
+using MerchantService.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace MerchantService.Shared.Extensions
+namespace MerchantService.Extensions
 {
     public static class ServiceCollectionExtensions
     {
@@ -21,14 +21,15 @@ namespace MerchantService.Shared.Extensions
             // Register DbContext Interface
             services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
 
-            // Add AutoMapper
-            services.AddAutoMapper(typeof(CategoryMappingProfile));
+            // Add AutoMapper with all profiles
+            services.AddAutoMapper(typeof(CategoryMappingProfile), typeof(ProductMappingProfile));
 
             // Add HttpContextAccessor for CurrentUserService
             services.AddHttpContextAccessor();
 
             // Add Application Services
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<IProductService, ProductService>();
 
             return services;
         }
@@ -38,6 +39,7 @@ namespace MerchantService.Shared.Extensions
             var mapperConfig = new MapperConfiguration(mc =>
             {
                 mc.AddProfile(new CategoryMappingProfile());
+                mc.AddProfile(new ProductMappingProfile());
                 // Add other profiles here as needed
             });
 
@@ -53,6 +55,13 @@ namespace MerchantService.Shared.Extensions
             // services.AddScoped<ICategoryService, CategoryService>();
             // services.AddScoped<ICategoryRepository, CategoryRepository>();
 
+            return services;
+        }
+
+        public static IServiceCollection AddProductServices(this IServiceCollection services)
+        {
+            // Product service is already added in AddApplicationServices
+            // Add additional product-related services here if needed
             return services;
         }
     }

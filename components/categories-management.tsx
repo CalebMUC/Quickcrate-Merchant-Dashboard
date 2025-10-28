@@ -70,6 +70,8 @@ import {
   type UpdateSubSubCategoryDto
 } from "@/lib/api/categories"
 
+import { CategoriesTable } from "./categories-table" 
+
 export function CategoriesManagement() {
   // State Management
   const [categories, setCategories] = useState<Category[]>([])
@@ -644,7 +646,7 @@ export function CategoriesManagement() {
       </div>
 
       {/* Search Section */}
-      <div className="flex items-center gap-2">
+      {/* <div className="flex items-center gap-2">
         <Search className="h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search categories..."
@@ -655,7 +657,7 @@ export function CategoriesManagement() {
         <Button onClick={handleSearch} variant="outline">
           Search
         </Button>
-      </div>
+      </div> */}
 
       {/* Error State */}
       {error && (
@@ -682,152 +684,13 @@ export function CategoriesManagement() {
 
       {/* Categories Table */}
       {!loading && filteredCategories.length > 0 && (
-        <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="font-semibold">Name</TableHead>
-                    <TableHead className="font-semibold">Description</TableHead>
-                    <TableHead className="font-semibold">Slug</TableHead>
-                    <TableHead className="font-semibold">Parent</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold text-center">Sort Order</TableHead>
-                    <TableHead className="font-semibold text-center">Products</TableHead>
-                    <TableHead className="font-semibold text-center">Subcategories</TableHead>
-                    <TableHead className="font-semibold text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCategories.map((category) => (
-                    <TableRow key={category.categoryId} className="group hover:bg-muted/30 transition-colors border-b border-border/40">
-                      <TableCell className="font-medium py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex-shrink-0 shadow-sm" />
-                            <div className="absolute inset-0 w-3 h-3 rounded-full bg-blue-400 animate-pulse opacity-0 group-hover:opacity-30 transition-opacity" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{category.name}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="max-w-xs">
-                          <p className="text-sm text-muted-foreground line-clamp-2 group-hover:text-foreground/80 transition-colors">
-                            {category.description || <span className="italic">No description</span>}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <code className="text-xs bg-muted/60 group-hover:bg-muted px-2 py-1 rounded font-mono transition-colors">
-                          {category.slug || <span className="italic text-muted-foreground">No slug</span>}
-                        </code>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        {category.parentId ? (
-                          <Badge variant="outline" className="text-xs hover:bg-muted transition-colors">
-                            <Folder className="h-3 w-3 mr-1" />
-                            Has Parent
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            <Tag className="h-3 w-3 mr-1" />
-                            Root Category
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-3">
-                        {category.isActive ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs border-emerald-200 transition-colors">
-                            <Eye className="h-3 w-3 mr-1" />
-                            Active
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-red-600 hover:bg-red-50 text-xs transition-colors">
-                            <EyeOff className="h-3 w-3 mr-1" />
-                            Inactive
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-3 text-center">
-                        <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted/40 group-hover:bg-muted transition-colors">
-                          <span className="text-sm font-mono text-muted-foreground group-hover:text-foreground">{category.sortOrder}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3 text-center">
-                        <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-default">
-                          <Tag className="h-3 w-3 mr-1" />
-                          {category.productCount || 0}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-3 text-center">
-                        <Badge variant="outline" className="text-xs hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 transition-colors cursor-default">
-                          <Folder className="h-3 w-3 mr-1" />
-                          {category.subcategories?.length || 0}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Quick Edit Button */}
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-100 hover:text-blue-600"
-                            onClick={() => openEditCategory(category)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          
-                          {/* Quick Add Subcategory Button */}
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-100 hover:text-green-600"
-                            onClick={() => openAddSubCategory(category.categoryId)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                          
-                          {/* More Actions Dropdown */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="h-7 w-7 p-0 hover:bg-muted-foreground/10"
-                              >
-                                <MoreHorizontal className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 shadow-lg border-border/50">
-                              <DropdownMenuItem 
-                                onClick={() => openEditCategory(category)}
-                                className="cursor-pointer hover:bg-blue-50 focus:bg-blue-50"
-                              >
-                                <Edit className="h-4 w-4 mr-2 text-blue-600" />
-                                <span>Edit Category</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => openAddSubCategory(category.categoryId)}
-                                className="cursor-pointer hover:bg-green-50 focus:bg-green-50"
-                              >
-                                <Plus className="h-4 w-4 mr-2 text-green-600" />
-                                <span>Add Subcategory</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => confirmDelete('category', category.categoryId, category.name)}
-                                className="cursor-pointer text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                <span>Delete Category</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+        <CategoriesTable
+          categories={filteredCategories}
+          openEditCategory={openEditCategory}
+          openAddSubCategory={openAddSubCategory}
+          confirmDelete={confirmDelete}
+          loading={loading}
+        />
       )}
 
       {/* Empty State */}
@@ -922,7 +785,7 @@ export function CategoriesManagement() {
           <SelectContent className="z-50"> {/* make dropdown appear on top */}
             <SelectItem value="none">No Parent (Root Category)</SelectItem>
             {categories.map((cat) => (
-              <SelectItem key={cat.categoryId} value={cat.categoryId}>
+              <SelectItem key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
                 {cat.name}
               </SelectItem>
             ))}
@@ -1095,8 +958,8 @@ export function CategoriesManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Parent (Root Category)</SelectItem>
-                      {categories.filter(cat => cat.categoryId !== editingCategory?.categoryId).map((cat) => (
-                        <SelectItem key={cat.categoryId} value={cat.categoryId}>
+                      {categories.filter(cat => (cat.categoryId || cat.id) !== (editingCategory?.categoryId || editingCategory?.id)).map((cat) => (
+                        <SelectItem key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
                           {cat.name}
                         </SelectItem>
                       ))}
@@ -1300,7 +1163,7 @@ export function CategoriesManagement() {
                         <SelectContent>
                           {categories.length > 0 ? (
                             categories.map((category) => (
-                              <SelectItem key={category.categoryId} value={category.categoryId}>
+                              <SelectItem key={category.categoryId || category.id} value={category.categoryId || category.id}>
                                 {category.name}
                               </SelectItem>
                             ))

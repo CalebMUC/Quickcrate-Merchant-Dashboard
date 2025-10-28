@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,9 +16,9 @@ const passwordResetSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: z.string()
     .min(8, 'Password must be at least 8 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/, 
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
       'Password must contain uppercase, lowercase, number and special character'),
-  confirmPassword: z.string().min(1, 'Please confirm your password')
+  confirmPassword: z.string()
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
@@ -38,79 +38,21 @@ export function PasswordResetForm() {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting, isValid },
-    watch,
-    getValues
+    formState: { errors, isSubmitting },
+    watch
   } = useForm<PasswordResetFormData>({
-    mode: 'onChange',
-    defaultValues: {
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    }
+    resolver: zodResolver(passwordResetSchema)
   });
-
-  // Debug validation state
-  React.useEffect(() => {
-    console.log('🔍 Form validation state:', {
-      isValid,
-      errors,
-      isSubmitting
-    });
-  }, [isValid, errors, isSubmitting]);
 
   const newPassword = watch('newPassword');
 
   const onSubmit = async (data: PasswordResetFormData) => {
-    console.log('🔄 Form submission started');
-    console.log('📋 Form data being sent:', data);
-    console.log('📊 All form values:', getValues());
-    console.log('❌ Form errors:', errors);
-    
-    // Basic validation
-    if (!data.currentPassword) {
-      console.log('❌ Missing current password');
-      return;
-    }
-    if (!data.newPassword) {
-      console.log('❌ Missing new password');
-      return;
-    }
-    if (!data.confirmPassword) {
-      console.log('❌ Missing confirm password');
-      return;
-    }
-    if (data.newPassword !== data.confirmPassword) {
-      console.log('❌ Passwords do not match');
-      return;
-    }
-    
     clearError();
+    const success = await resetPassword(data);
     
-    try {
-      console.log('🚀 Calling resetPassword...');
-      const success = await resetPassword(data);
-      console.log('✅ Reset password result:', success);
-      
-      if (success) {
-        console.log('🎉 Password reset successful, redirecting to dashboard');
-        router.push('/dashboard');
-      } else {
-        console.log('❌ Password reset failed');
-      }
-    } catch (error) {
-      console.error('💥 Password reset error:', error);
+    if (success) {
+      router.push('/dashboard');
     }
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    console.log('🎯 Form submit event triggered');
-    console.log('📊 Form validity:', {
-      isSubmitting,
-      hasErrors: Object.keys(errors).length > 0,
-      errors
-    });
-    handleSubmit(onSubmit)(e);
   };
 
   const getPasswordStrength = (password: string): { strength: number; label: string; color: string } => {
@@ -143,7 +85,7 @@ export function PasswordResetForm() {
         </CardHeader>
         
         <CardContent>
-          <form onSubmit={handleFormSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -164,9 +106,8 @@ export function PasswordResetForm() {
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  {...register('currentPassword', { required: 'Current password is required' })}
+                  {...register('currentPassword')}
                   id="currentPassword"
-                  name="currentPassword"
                   type={showPasswords.current ? 'text' : 'password'}
                   placeholder="Enter temporary password"
                   className="pl-9 pr-9"
@@ -192,9 +133,8 @@ export function PasswordResetForm() {
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  {...register('newPassword', { required: 'New password is required' })}
+                  {...register('newPassword')}
                   id="newPassword"
-                  name="newPassword"
                   type={showPasswords.new ? 'text' : 'password'}
                   placeholder="Create new password"
                   className="pl-9 pr-9"
@@ -241,9 +181,8 @@ export function PasswordResetForm() {
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  {...register('confirmPassword', { required: 'Please confirm your password' })}
+                  {...register('confirmPassword')}
                   id="confirmPassword"
-                  name="confirmPassword"
                   type={showPasswords.confirm ? 'text' : 'password'}
                   placeholder="Confirm new password"
                   className="pl-9 pr-9"
@@ -273,22 +212,9 @@ export function PasswordResetForm() {
             </div>
 
             <Button 
-              type="button"
-              className="w-full mb-2" 
-              variant="outline"
-              onClick={() => {
-                const values = getValues();
-                console.log('🧪 Test - Current form values:', values);
-              }}
-            >
-              Test Form Values (Debug)
-            </Button>
-
-            <Button 
               type="submit" 
               className="w-full" 
               disabled={isSubmitting}
-              onClick={() => console.log('🔘 Submit button clicked!')}
             >
               {isSubmitting ? (
                 <>

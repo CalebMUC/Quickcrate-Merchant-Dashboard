@@ -6,116 +6,111 @@ namespace MerchantService.Model
     public class Product
     {
         [Key]
-        public int Id { get; set; }
-
+        public Guid ProductId { get; set; }
+        
         [Required]
         [MaxLength(255)]
-        public string Name { get; set; } = string.Empty;
-
+        public string ProductName { get; set; } = string.Empty;
+        
         [MaxLength(2000)]
-        public string? Description { get; set; }
-
-        [Required]
-        [MaxLength(255)]
-        public string Slug { get; set; } = string.Empty;
-
+        public string Description { get; set; } = string.Empty;
+        
+        [MaxLength(2000)]
+        public string ProductDescription { get; set; } = string.Empty;
+        
         [Required]
         [Column(TypeName = "decimal(18,2)")]
         public decimal Price { get; set; }
-
+        
         [Column(TypeName = "decimal(18,2)")]
-        public decimal? CompareAtPrice { get; set; }
-
+        public decimal Discount { get; set; }
+        
         [Required]
-        public int StockQuantity { get; set; } = 0;
+        public int StockQuantity { get; set; }
+        
+        [MaxLength(100)]
+        public string SKU { get; set; } = string.Empty;
 
-        [MaxLength(50)]
-        public string? SKU { get; set; }
-
-        [MaxLength(50)]
-        public string? Barcode { get; set; }
-
-        public bool TrackQuantity { get; set; } = true;
-
-        public bool ContinueSellingWhenOutOfStock { get; set; } = false;
-
-        public bool IsActive { get; set; } = true;
-
-        public bool IsFeatured { get; set; } = false;
-
-        [Required]
-        public int MerchantId { get; set; }
-
-        // Category relationships
-        public int? CategoryId { get; set; }
-        public int? SubCategoryId { get; set; }
-        public int? SubSubCategoryId { get; set; }
-
-        [MaxLength(500)]
-        public string? ImageUrl { get; set; }
-
+        // Category Information
+        public Guid CategoryId { get; set; }
+        
         [MaxLength(255)]
-        public string? MetaTitle { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
+        
+        public Guid? SubCategoryId { get; set; }
+        
+        [MaxLength(255)]
+        public string? SubCategoryName { get; set; }
 
-        [MaxLength(500)]
-        public string? MetaDescription { get; set; }
+        public Guid? SubSubCategoryId { get; set; }
+        
+        [MaxLength(255)]
+        public string? SubSubCategoryName { get; set; }
 
+        [MaxLength(4000)]
+        public string ProductSpecification { get; set; } = string.Empty; //save as Json
+        
+        [MaxLength(2000)]
+        public string Features { get; set; } = string.Empty;
+        
+        [MaxLength(1000)]
+        public string BoxContents { get; set; } = string.Empty;
+        
+        [MaxLength(100)]
+        public string ProductType { get; set; } = string.Empty;
+
+        // Status & Features
+        public bool IsActive { get; set; } = true;
+        public bool IsFeatured { get; set; } = false;
+        
+        [MaxLength(50)]
+        public string Status { get; set; } = "pending";
+
+        // Images - stored as JSON string
+        [MaxLength(4000)]
+        public string ImageUrls { get; set; } = "[]";
+
+        // Merchant Relationship
+        public Guid MerchantID { get; set; }
+
+        // Audit Fields
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
-
-        public DateTime? UpdatedOn { get; set; }
-
+        
         [Required]
         [MaxLength(255)]
         public string CreatedBy { get; set; } = string.Empty;
-
+        
+        public DateTime? UpdatedOn { get; set; }
+        
         [MaxLength(255)]
         public string? UpdatedBy { get; set; }
-
-        // Additional product attributes
-        [MaxLength(100)]
-        public string? Brand { get; set; }
-
-        [MaxLength(100)]
-        public string? Model { get; set; }
-
-        [MaxLength(50)]
-        public string? Color { get; set; }
-
-        [MaxLength(50)]
-        public string? Size { get; set; }
-
-        [Column(TypeName = "decimal(10,2)")]
-        public decimal? Weight { get; set; }
-
-        [MaxLength(100)]
-        public string? Dimensions { get; set; }
-
-        [MaxLength(100)]
-        public string? Material { get; set; }
-
-        [MaxLength(1000)]
-        public string? Tags { get; set; }
-
-        [MaxLength(2000)]
-        public string? KeyFeatures { get; set; }
-
-        [MaxLength(2000)]
-        public string? Specification { get; set; }
-
-        [MaxLength(50)]
-        public string? Status { get; set; } = "active";
+        
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedOn { get; set; }
+        
+        [MaxLength(255)]
+        public string? DeletedBy { get; set; }
 
         // Navigation Properties
-        [ForeignKey("MerchantId")]
-        public virtual Merchants? Merchant { get; set; }
+        [ForeignKey("MerchantID")]
+        public virtual Merchants Merchant { get; set; } = null!;
 
         [ForeignKey("CategoryId")]
-        public virtual Category? Category { get; set; }
+        public virtual Category Category { get; set; } = null!;
 
         [ForeignKey("SubCategoryId")]
         public virtual SubCategory? SubCategory { get; set; }
 
         [ForeignKey("SubSubCategoryId")]
         public virtual SubSubCategory? SubSubCategory { get; set; }
+        
+        // Helper property to work with ImageUrls as List
+        [NotMapped]
+        public List<string> ImageUrlsList
+        {
+            get => string.IsNullOrEmpty(ImageUrls) ? new List<string>() : 
+                   System.Text.Json.JsonSerializer.Deserialize<List<string>>(ImageUrls) ?? new List<string>();
+            set => ImageUrls = System.Text.Json.JsonSerializer.Serialize(value);
+        }
     }
 }

@@ -1,0 +1,338 @@
+"use client"
+
+import { useState } from "react"
+import Image from "next/image"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Edit,
+  Trash2,
+  Plus,
+  MoreHorizontal,
+  Tag,
+  Folder,
+  Eye,
+  EyeOff,
+  Search,
+} from "lucide-react"
+
+// Category Image Component with fallback
+function CategoryImage({ imageUrl, name }: { imageUrl?: string; name: string }) {
+  const [imageError, setImageError] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Show fallback icon if no imageUrl or error occurred
+  if (!imageUrl || imageError) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+        <Tag className="h-5 w-5 text-white" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-10 h-10 rounded-lg overflow-hidden border border-border bg-muted relative">
+      {isLoading && (
+        <div className="absolute inset-0 bg-muted animate-pulse flex items-center justify-center">
+          <Tag className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
+      <Image
+        src={imageUrl}
+        alt={`${name} category image`}
+        width={40}
+        height={40}
+        className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-200 ${
+          isLoading ? 'opacity-0' : 'opacity-100'
+        }`}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setImageError(true)
+          setIsLoading(false)
+        }}
+        unoptimized={true} // For external URLs
+      />
+    </div>
+  )
+}
+
+export function CategoriesTable({
+  categories,
+  openEditCategory,
+  openAddSubCategory,
+  confirmDelete,
+  loading,
+}: {
+  categories: any[]
+  openEditCategory: (cat: any) => void
+  openAddSubCategory: (id: string) => void
+  confirmDelete: (type: 'category' | 'subcategory' | 'subsubcategory', id: string, name: string) => void
+  loading: boolean
+}) {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+
+  const filteredCategories = categories.filter((category) => {
+    const matchesSearch =
+      category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      category.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && category.isActive) ||
+      (statusFilter === "inactive" && !category.isActive)
+    return matchesSearch && matchesStatus
+  })
+
+  return (
+    <div className="space-y-4">
+      {/* Search + Filter Bar */}
+      <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search categories..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-background"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px] bg-background">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Categories Table */}
+      {!loading && filteredCategories.length > 0 ? (
+        <div className="rounded-md border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Category</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Slug</TableHead>
+                <TableHead>Parent</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-center">Sort</TableHead>
+                <TableHead className="text-center">Products</TableHead>
+                <TableHead className="text-center">Subcategories</TableHead>
+                <TableHead className="text-right w-[140px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {filteredCategories.map((category, index) => (
+                <TableRow
+                  key={category.categoryId}
+                  className="hover:bg-muted/30 transition-colors group"
+                  style={{
+                    animationDelay: `${index * 50}ms`,
+                  }}
+                >
+                  {/* Name */}
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      {/* Category Image */}
+                      <div className="relative flex-shrink-0">
+                        <CategoryImage
+                          imageUrl={category.imageUrl}
+                          name={category.name}
+                        />
+                        <div className="absolute inset-0 w-10 h-10 rounded-lg bg-blue-400/20 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      
+                      {/* Category Info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium group-hover:text-blue-600 transition-colors truncate">
+                          {category.name}
+                        </div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          {category.slug || 'No slug'}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  {/* Description */}
+                  <TableCell>
+                    {category.description ? (
+                      <div className="relative group">
+                        <p className="text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors max-w-xs">
+                          {category.description.length > 50 
+                            ? `${category.description.substring(0, 30)}...`
+                            : category.description
+                          }
+                        </p>
+                        {category.description.length > 50 && (
+                          <div className="absolute z-50 invisible group-hover:visible bg-popover border border-border rounded-md p-3 shadow-lg max-w-sm -top-2 left-0 transform -translate-y-full">
+                            <p className="text-sm text-popover-foreground whitespace-pre-wrap break-words">
+                              {category.description}
+                            </p>
+                            <div className="absolute top-full left-4 w-2 h-2 bg-popover border-r border-b border-border transform rotate-45 -translate-y-1"></div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="italic text-muted-foreground text-sm">No description</span>
+                    )}
+                  </TableCell>
+
+                  {/* Slug */}
+                  <TableCell>
+                    <code className="text-xs bg-muted/60 group-hover:bg-muted px-2 py-1 rounded font-mono transition-colors">
+                      {category.slug || <span className="italic text-muted-foreground">No slug</span>}
+                    </code>
+                  </TableCell>
+
+                  {/* Parent */}
+                  <TableCell>
+                    {category.parentId ? (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        <Folder className="h-3 w-3 mr-1" />
+                        Subcategory
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                        <Tag className="h-3 w-3 mr-1" />
+                        Root
+                      </Badge>
+                    )}
+                  </TableCell>
+
+                  {/* Status */}
+                  <TableCell>
+                    {category.isActive ? (
+                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20">
+                        <Eye className="h-3 w-3 mr-1" />
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20">
+                        <EyeOff className="h-3 w-3 mr-1" />
+                        Inactive
+                      </Badge>
+                    )}
+                  </TableCell>
+
+                  {/* Sort */}
+                  <TableCell className="text-center font-medium">
+                    {category.sortOrder ?? 0}
+                  </TableCell>
+
+                  {/* Products */}
+                  <TableCell className="text-center">
+                    <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-default">
+                      <Tag className="h-3 w-3 mr-1" />
+                      {category.productCount || 0}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Subcategories */}
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className="text-xs hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 transition-colors cursor-default">
+                      <Folder className="h-3 w-3 mr-1" />
+                      {category.subcategories?.length || 0}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Actions */}
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      {/* Add Subcategory Button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-green-100 hover:text-green-600 hover:scale-110"
+                        onClick={() => openAddSubCategory(category.categoryId || category.id)}
+                        title="Add Subcategory"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      
+                      {/* Edit Button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-100 hover:text-blue-600 hover:scale-110"
+                        onClick={() => openEditCategory(category)}
+                        title="Edit Category"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      
+                      {/* Delete Button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-100 hover:text-red-600 hover:scale-110"
+                        onClick={() => confirmDelete("category", category.categoryId || category.id, category.name)}
+                        title="Delete Category"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      
+                      {/* More Actions Dropdown (backup) */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                            title="More Actions"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => openEditCategory(category)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Category
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openAddSubCategory(category.categoryId || category.id)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Subcategory
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => confirmDelete("category", category.categoryId || category.id, category.name)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Category
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        !loading && (
+          <div className="text-center py-10 text-muted-foreground">
+            No categories found
+          </div>
+        )
+      )}
+    </div>
+  )
+}

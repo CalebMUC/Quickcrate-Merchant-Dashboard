@@ -24,6 +24,7 @@ export interface Category {
 
 export interface SubCategory {
   id: string // Changed to string for GUID support
+  subCategoryId?: string // Primary identifier in database
   name: string
   description?: string
   slug: string
@@ -42,6 +43,7 @@ export interface SubCategory {
 
 export interface SubSubCategory {
   id: string // Changed to string for GUID support
+  subSubCategoryId?: string // Primary identifier in database
   name: string
   description?: string
   slug: string

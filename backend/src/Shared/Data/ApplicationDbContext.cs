@@ -350,42 +350,69 @@ namespace MerchantService.Data
             // Product configuration
             builder.Entity<Product>(entity =>
             {
-                entity.HasKey(e => e.Id);
+                entity.HasKey(e => e.ProductId);
 
-                entity.Property(e => e.Name)
+                entity.Property(e => e.ProductName)
                     .IsRequired()
                     .HasMaxLength(255);
 
                 entity.Property(e => e.Description)
                     .HasMaxLength(2000);
 
-                entity.Property(e => e.Slug)
-                    .IsRequired()
-                    .HasMaxLength(255);
+                entity.Property(e => e.ProductDescription)
+                    .HasMaxLength(2000);
 
                 entity.Property(e => e.Price)
                     .HasColumnType("decimal(18,2)")
                     .IsRequired();
 
-                entity.Property(e => e.CompareAtPrice)
-                    .HasColumnType("decimal(18,2)");
-
-                entity.Property(e => e.Weight)
-                    .HasColumnType("decimal(10,2)");
+                entity.Property(e => e.Discount)
+                    .HasColumnType("decimal(18,2)")
+                    .HasDefaultValue(0);
 
                 entity.Property(e => e.StockQuantity)
                     .HasDefaultValue(0);
 
-                entity.Property(e => e.TrackQuantity)
-                    .HasDefaultValue(true);
+                entity.Property(e => e.SKU)
+                    .HasMaxLength(100);
 
-                entity.Property(e => e.ContinueSellingWhenOutOfStock)
-                    .HasDefaultValue(false);
+                entity.Property(e => e.CategoryName)
+                    .IsRequired()
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.SubCategoryName)
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.SubSubCategoryName)
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.ProductSpecification)
+                    .HasMaxLength(4000);
+
+                entity.Property(e => e.Features)
+                    .HasMaxLength(2000);
+
+                entity.Property(e => e.BoxContents)
+                    .HasMaxLength(1000);
+
+                entity.Property(e => e.ProductType)
+                    .HasMaxLength(100);
 
                 entity.Property(e => e.IsActive)
                     .HasDefaultValue(true);
 
                 entity.Property(e => e.IsFeatured)
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.Status)
+                    .HasMaxLength(50)
+                    .HasDefaultValue("pending");
+
+                entity.Property(e => e.ImageUrls)
+                    .HasMaxLength(4000)
+                    .HasDefaultValue("[]");
+
+                entity.Property(e => e.IsDeleted)
                     .HasDefaultValue(false);
 
                 entity.Property(e => e.CreatedOn)
@@ -398,77 +425,34 @@ namespace MerchantService.Data
                 entity.Property(e => e.UpdatedBy)
                     .HasMaxLength(255);
 
-                entity.Property(e => e.SKU)
-                    .HasMaxLength(50);
-
-                entity.Property(e => e.Barcode)
-                    .HasMaxLength(50);
-
-                entity.Property(e => e.Brand)
-                    .HasMaxLength(100);
-
-                entity.Property(e => e.Model)
-                    .HasMaxLength(100);
-
-                entity.Property(e => e.Color)
-                    .HasMaxLength(50);
-
-                entity.Property(e => e.Size)
-                    .HasMaxLength(50);
-
-                entity.Property(e => e.Dimensions)
-                    .HasMaxLength(100);
-
-                entity.Property(e => e.Material)
-                    .HasMaxLength(100);
-
-                entity.Property(e => e.Tags)
-                    .HasMaxLength(1000);
-
-                entity.Property(e => e.KeyFeatures)
-                    .HasMaxLength(2000);
-
-                entity.Property(e => e.Specification)
-                    .HasMaxLength(2000);
-
-                entity.Property(e => e.Status)
-                    .HasMaxLength(50)
-                    .HasDefaultValue("active");
-
-                entity.Property(e => e.ImageUrl)
-                    .HasMaxLength(500);
-
-                entity.Property(e => e.MetaTitle)
+                entity.Property(e => e.DeletedBy)
                     .HasMaxLength(255);
-
-                entity.Property(e => e.MetaDescription)
-                    .HasMaxLength(500);
 
                 // Product-Merchant relationship
                 entity.HasOne(p => p.Merchant)
                     .WithMany()
-                    .HasForeignKey(p => p.MerchantId)
+                    .HasForeignKey(p => p.MerchantID)
                     .OnDelete(DeleteBehavior.Cascade);
 
                 // Product-Category relationships
                 entity.HasOne(p => p.Category)
-                    .WithMany(c => c.Products)
+                    .WithMany()
                     .HasForeignKey(p => p.CategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasOne(p => p.SubCategory)
-                    .WithMany(sc => sc.Products)
+                    .WithMany()
                     .HasForeignKey(p => p.SubCategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasOne(p => p.SubSubCategory)
-                    .WithMany(ssc => ssc.Products)
+                    .WithMany()
                     .HasForeignKey(p => p.SubSubCategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
 
                 // Indexes for performance
-                entity.HasIndex(e => e.MerchantId)
-                    .HasDatabaseName("IX_Products_MerchantId");
+                entity.HasIndex(e => e.MerchantID)
+                    .HasDatabaseName("IX_Products_MerchantID");
 
                 entity.HasIndex(e => e.CategoryId)
                     .HasDatabaseName("IX_Products_CategoryId");
@@ -485,18 +469,34 @@ namespace MerchantService.Data
                 entity.HasIndex(e => e.IsFeatured)
                     .HasDatabaseName("IX_Products_IsFeatured");
 
+                entity.HasIndex(e => e.IsDeleted)
+                    .HasDatabaseName("IX_Products_IsDeleted");
+
                 entity.HasIndex(e => e.SKU)
                     .HasDatabaseName("IX_Products_SKU");
 
-                entity.HasIndex(e => new { e.Slug, e.MerchantId })
+                entity.HasIndex(e => e.Status)
+                    .HasDatabaseName("IX_Products_Status");
+
+                entity.HasIndex(e => new { e.SKU, e.MerchantID })
                     .IsUnique()
-                    .HasDatabaseName("UQ_Products_Slug_MerchantId");
+                    .HasDatabaseName("UQ_Products_SKU_MerchantID")
+                    .HasFilter("SKU IS NOT NULL AND SKU != ''");
 
-                entity.HasIndex(e => new { e.MerchantId, e.IsActive })
-                    .HasDatabaseName("IX_Products_MerchantId_IsActive");
+                entity.HasIndex(e => new { e.MerchantID, e.IsActive, e.IsDeleted })
+                    .HasDatabaseName("IX_Products_MerchantID_IsActive_IsDeleted");
 
-                entity.HasIndex(e => new { e.MerchantId, e.CategoryId, e.IsActive })
-                    .HasDatabaseName("IX_Products_MerchantId_CategoryId_IsActive");
+                entity.HasIndex(e => new { e.MerchantID, e.CategoryId, e.IsActive, e.IsDeleted })
+                    .HasDatabaseName("IX_Products_MerchantID_CategoryId_IsActive_IsDeleted");
+
+                entity.HasIndex(e => new { e.CategoryId, e.IsActive, e.IsDeleted })
+                    .HasDatabaseName("IX_Products_CategoryId_IsActive_IsDeleted");
+
+                entity.HasIndex(e => e.CreatedOn)
+                    .HasDatabaseName("IX_Products_CreatedOn");
+
+                entity.HasIndex(e => e.UpdatedOn)
+                    .HasDatabaseName("IX_Products_UpdatedOn");
             });
 
             // Seed default roles

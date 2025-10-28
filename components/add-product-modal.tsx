@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { use, useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -22,8 +22,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { toast } from "@/components/ui/use-toast"
-import { productsService, type ProductFormData, type ProductImageUpload } from "@/lib/api/products"
+import { toast } from "sonner"
+import { productsService, type ProductFormData, type CreateProductDto, type ProductImageUpload } from "@/lib/api/products"
 import {
   Form,
   FormControl,
@@ -47,69 +47,217 @@ import {
   Settings,
   AlertCircle,
   Check,
-  Loader2
+  Loader2,
+  Sparkles
 } from "lucide-react"
+import { categoriesService, Category, SubCategory, SubSubCategory } from "@/lib/api/categories"
+import { set } from "date-fns"
 
-// Zod schema for product validation
+// Zod schema for product validation - Updated to match backend CreateProductDto
 const productSchema = z.object({
-  // Basic Information
+  // Basic Information - Required fields from CreateProductDto
   productName: z.string()
     .min(1, "Product name is required")
     .max(255, "Product name must be less than 255 characters"),
   description: z.string()
-    .min(1, "Description is required"),
+    .min(1, "Description is required")
+    .max(2000, "Description cannot exceed 2000 characters"),
   productDescription: z.string()
-    .min(1, "Product description is required"),
+    .min(1, "Product description is required")
+    .max(2000, "Product description cannot exceed 2000 characters"),
   price: z.number()
     .min(0.01, "Price must be greater than 0")
     .max(999999.99, "Price is too high"),
-  stockQuantity: z.number()
-    .int("Stock quantity must be a whole number")
-    .min(0, "Stock quantity cannot be negative"),
-  
-  // Category Information
-  categoryId: z.number().min(1, "Category is required"),
-  categoryName: z.string()
-    .min(1, "Category name is required")
-    .max(100, "Category name must be less than 100 characters"),
-  subCategoryId: z.number().optional(),
-  subCategoryName: z.string()
-    .max(100, "Subcategory name must be less than 100 characters")
-    .optional(),
-  subSubCategoryId: z.number().optional(),
-  subSubCategoryName: z.string()
-    .max(100, "Sub-subcategory name must be less than 100 characters")
-    .optional(),
-  
-  // Product Details
-  productType: z.string()
-    .max(100, "Product type must be less than 100 characters")
-    .optional(),
-  keyFeatures: z.string()
-    .min(1, "Key features are required"),
-  specification: z.string()
-    .min(1, "Specifications are required"),
-  box: z.string()
-    .min(1, "Box contents are required"),
-  searchKeyWord: z.string()
-    .min(1, "Search keywords are required")
-    .max(500, "Search keywords must be less than 500 characters"),
-  
-  // Pricing & Stock
   discount: z.number()
     .min(0, "Discount cannot be negative")
     .max(100, "Discount cannot exceed 100%")
     .default(0),
-  inStock: z.boolean().default(true),
+  stockQuantity: z.number()
+    .int("Stock quantity must be a whole number")
+    .min(0, "Stock quantity cannot be negative"),
+  sku: z.string()
+    .max(100, "SKU cannot exceed 100 characters")
+    .optional(),
   
-  // Images (will be handled separately)
-  imageType: z.string().default("product"),
+  // Category Information - More flexible validation
+  categoryId: z.string()
+    .min(1, "Category is required"),
+  categoryName: z.string()
+    .optional()
+    .default(""),
+  subCategoryId: z.string()
+    .optional()
+    .nullable()
+    .default(null),
+  subCategoryName: z.string()
+    .optional()
+    .nullable()
+    .default(null),
+  subSubCategoryId: z.string()
+    .optional()
+    .nullable()
+    .default(null),
+  subSubCategoryName: z.string()
+    .optional()
+    .nullable()
+    .default(null),
   
-  // System fields (will be set automatically)
-  isSaved: z.boolean().default(false)
+  // Product Details - More flexible validation
+  productSpecification: z.string()
+    .default(""),
+  features: z.string()
+    .default(""),
+  boxContents: z.string()
+    .default(""),
+  productType: z.string()
+    .max(100, "Product type cannot exceed 100 characters")
+    .default("physical"),
+  
+  // Status & Features
+  isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
+  status: z.string()
+    .max(50, "Status cannot exceed 50 characters")
+    .default("pending"),
+  
+  // Search and Tags - Optional
+  searchKeywords: z.string()
+    .default(""),
+  
+  // Images (handled as separate array)
+  imageUrls: z.array(z.string()).default([]),
+  
+  // Merchant ID - Will be populated from auth context
+  merchantID: z.string()
+    .default("00000000-0000-0000-0000-000000000000")
 })
 
 type LocalProductFormData = z.infer<typeof productSchema>
+
+// AI Extraction utility function
+function extractProductInfo(productText: string): {
+  ProductSpecifications: Record<string, string>;
+  ProductFeatures: string[];
+} {
+  const lines = productText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  
+  const specifications: Record<string, string> = {};
+  const features: string[] = [];
+  
+  for (const line of lines) {
+    // Check for specification patterns (key: value, key - value, key\t value)
+    const specPatterns = [
+      /^(.+?):\s*(.+)$/, // Key: Value
+      /^(.+?)\s*[-–—]\s*(.+)$/, // Key - Value  
+      /^(.+?)\t+(.+)$/, // Key\tValue
+      /^(.+?)\s{2,}(.+)$/ // Key  Value (multiple spaces)
+    ];
+    
+    let isSpecification = false;
+    
+    for (const pattern of specPatterns) {
+      const match = line.match(pattern);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim();
+        
+        // Filter out common specification patterns
+        const specKeywords = [
+          'size', 'weight', 'dimensions', 'resolution', 'capacity', 'speed', 'power', 
+          'voltage', 'frequency', 'material', 'color', 'model', 'brand', 'processor',
+          'memory', 'storage', 'display', 'battery', 'connectivity', 'ports', 'os',
+          'operating system', 'chipset', 'graphics', 'camera', 'sensor', 'interface'
+        ];
+        
+        const isLikelySpec = specKeywords.some(keyword => 
+          key.toLowerCase().includes(keyword) || value.toLowerCase().includes(keyword)
+        );
+        
+        if (isLikelySpec && key.length < 50 && value.length < 100) {
+          specifications[key] = value;
+          isSpecification = true;
+          break;
+        }
+      }
+    }
+    
+    // If not a specification, treat as a feature (skip very short lines)
+    if (!isSpecification && line.length > 10) {
+      // Clean up feature text
+      let feature = line.replace(/^[•\-\*\+]\s*/, ''); // Remove bullet points
+      feature = feature.replace(/^\d+\.\s*/, ''); // Remove numbered lists
+      
+      if (feature.length > 5) {
+        features.push(feature);
+      }
+    }
+  }
+  
+  return {
+    ProductSpecifications: specifications,
+    ProductFeatures: features
+  };
+}
+
+// Helper function to format ProductSpecification for backend
+function formatProductSpecification(specText: string): string {
+  if (!specText.trim()) return "";
+  
+  // Check if it's in structured JSON format (from AI extraction)
+  try {
+    const parsed = JSON.parse(specText);
+    if (parsed && typeof parsed === 'object') {
+      // Handle structured format with metadata
+      if (parsed._format === "structured" && parsed.ProductSpecifications) {
+        // Convert structured JSON to backend text format
+        return Object.entries(parsed.ProductSpecifications)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+      }
+      // Handle direct ProductSpecifications object
+      else if (parsed.ProductSpecifications) {
+        return Object.entries(parsed.ProductSpecifications)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+      }
+    }
+  } catch {
+    // Not JSON, treat as regular text
+  }
+  
+  // Return as-is if it's already in text format
+  return specText;
+}
+
+// Helper function to format ProductFeatures for backend  
+function formatProductFeatures(featuresText: string): string {
+  if (!featuresText.trim()) return "";
+  
+  // Check if it's in structured JSON format (from AI extraction)
+  try {
+    const parsed = JSON.parse(featuresText);
+    if (parsed && typeof parsed === 'object') {
+      // Handle structured format with metadata
+      if (parsed._format === "structured" && Array.isArray(parsed.ProductFeatures)) {
+        // Convert structured JSON to backend text format
+        return parsed.ProductFeatures
+          .map(feature => feature.startsWith('•') ? feature : `• ${feature}`)
+          .join('\n');
+      }
+      // Handle direct ProductFeatures array
+      else if (Array.isArray(parsed.ProductFeatures)) {
+        return parsed.ProductFeatures
+          .map(feature => feature.startsWith('•') ? feature : `• ${feature}`)
+          .join('\n');
+      }
+    }
+  } catch {
+    // Not JSON, treat as regular text
+  }
+  
+  // Return as-is if it's already in text format
+  return featuresText;
+}
 
 interface AddProductModalProps {
   trigger?: React.ReactNode
@@ -128,29 +276,16 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("basic")
+  const [categories, setCategories] = useState<Category[]>([])
+  const [subCategories, setSubCategories] = useState<SubCategory[]>([])
+  const [subSubCategories, setSubSubCategories] = useState<SubSubCategory[]>([])
 
-  // Categories data (in production, fetch from API)
-  const categories = [
-    { id: 1, name: "Electronics" },
-    { id: 2, name: "Clothing & Fashion" },
-    { id: 3, name: "Home & Garden" },
-    { id: 4, name: "Sports & Outdoors" },
-    { id: 5, name: "Books & Media" },
-    { id: 6, name: "Health & Beauty" },
-    { id: 7, name: "Automotive" },
-    { id: 8, name: "Toys & Games" }
-  ]
+  const [loadingCategories, setLoadingCategories] = useState(false)
+  const [loadingSubCategories, setLoadingSubCategories] = useState(false)
+  const [loadingSubSubCategories, setLoadingSubSubCategories] = useState(false)
 
-  const subCategories = [
-    { id: 1, parentId: 1, name: "Smartphones" },
-    { id: 2, parentId: 1, name: "Laptops" },
-    { id: 3, parentId: 1, name: "Headphones" },
-    { id: 4, parentId: 1, name: "Cameras" },
-    { id: 5, parentId: 2, name: "Men's Clothing" },
-    { id: 6, parentId: 2, name: "Women's Clothing" },
-    { id: 7, parentId: 2, name: "Shoes" },
-    { id: 8, parentId: 2, name: "Accessories" }
-  ]
+  const [refreshing, setRefreshing] = useState(false)
+  const [rawText, setRawText] = useState("")
 
   const form = useForm<LocalProductFormData>({
     resolver: zodResolver(productSchema),
@@ -159,27 +294,148 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
       description: "",
       productDescription: "",
       price: 0,
-      stockQuantity: 0,
-      categoryId: 0,
-      categoryName: "",
-      subCategoryId: undefined,
-      subCategoryName: "",
-      subSubCategoryId: undefined,
-      subSubCategoryName: "",
-      productType: "",
-      keyFeatures: "",
-      specification: "",
-      box: "",
-      searchKeyWord: "",
       discount: 0,
-      inStock: true,
-      imageType: "product",
-      isSaved: false
+      stockQuantity: 0,
+      sku: "",
+      categoryId: "",
+      categoryName: "",
+      subCategoryId: "",
+      subCategoryName: "",
+      subSubCategoryId: "",
+      subSubCategoryName: "",
+      productSpecification: "",
+      features: "",
+      boxContents: "",
+      productType: "physical",
+      isActive: true,
+      isFeatured: false,
+      status: "pending",
+      searchKeywords: "",
+      imageUrls: [],
+      merchantID: "00000000-0000-0000-0000-000000000000" // Default GUID - will be set from auth context
     }
   })
 
   const watchedCategoryId = form.watch("categoryId")
   const watchedSubCategoryId = form.watch("subCategoryId")
+
+  // Load categories when modal opens
+  useEffect(() => {
+    if (open) {
+      loadCategories()
+    }
+  }, [open])
+
+  // Load subcategories when category changes
+  useEffect(() => {
+    if (watchedCategoryId) {
+      loadSubCategories(watchedCategoryId)
+    } else {
+      setSubCategories([])
+      setSubSubCategories([])
+    }
+  }, [watchedCategoryId])
+
+  // Load sub-subcategories when subcategory changes
+  useEffect(() => {
+    if (watchedSubCategoryId) {
+      loadSubSubCategories(watchedSubCategoryId)
+    } else {
+      setSubSubCategories([])
+    }
+  }, [watchedSubCategoryId])
+
+  // =====================================
+  // API OPERATIONS
+  // =====================================
+
+  const loadCategories = async () => {
+    try{
+        setLoadingCategories(true);
+      
+      const response = await categoriesService.getCategories({
+        search: '',
+        sortBy: 'sortOrder',
+        sortOrder: 'asc'
+      });
+      console.log('✅ Categories loaded:', response.categories.length);
+      setCategories(response.categories);
+
+      // Reset subcategories when categories change
+      setSubCategories([])
+      setSubSubCategories([])
+    }
+    catch(error){
+      console.error('💥 Error loading categories:', error);
+      toast.error("Error Loading Categories", {
+        description: "Failed to load categories. Please try again.",
+      })
+    } finally {
+      setLoadingCategories(false)
+    }
+  }
+
+  const loadSubCategories = async (categoryId: string) => {
+    if (!categoryId) {
+      setSubCategories([])
+      setSubSubCategories([])
+      return
+    }
+
+    try {
+      setLoadingSubCategories(true)
+      console.log('🔄 Loading subcategories for category:', categoryId)
+      
+      const response = await categoriesService.getSubCategories(categoryId)
+      
+      console.log('✅ Subcategories loaded:', response.length)
+      setSubCategories(response.map((cat: SubCategory) => ({
+        ...cat,
+        categoryId: categoryId
+      })))
+      
+      // Reset sub-subcategories when subcategories change
+      setSubSubCategories([])
+      
+    } catch (error) {
+      console.error('💥 Error loading subcategories for category', categoryId, ':', error)
+      setSubCategories([])
+      toast.error("Error Loading Subcategories", {
+        description: "Failed to load subcategories. Please try again.",
+      })
+    } finally {
+      setLoadingSubCategories(false)
+    }
+  }
+
+  const loadSubSubCategories = async (subCategoryId: string) => {
+    if (!subCategoryId) {
+      setSubSubCategories([])
+      return
+    }
+
+    try {
+      setLoadingSubSubCategories(true)
+      console.log('🔄 Loading sub-subcategories for subcategory:', subCategoryId)
+      
+      const response = await categoriesService.getSubSubCategories(subCategoryId)
+      
+      console.log('✅ Sub-subcategories loaded:', response.length)
+      setSubSubCategories(response.map((cat: SubSubCategory) => ({
+        ...cat,
+        subCategoryId: subCategoryId
+      })))
+      
+    } catch (error) {
+      console.error('💥 Error loading sub-subcategories for subcategory', subCategoryId, ':', error)
+      setSubSubCategories([])
+      toast.error("Error Loading Sub-subcategories", {
+        description: "Failed to load sub-subcategories. Please try again.",
+      })
+    } finally {
+      setLoadingSubSubCategories(false)
+    }
+  }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -211,100 +467,274 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
   }
 
   const handleSubmit = async (data: LocalProductFormData) => {
+    console.log('🚀 Form submitted with data:', data)
+    console.log('🔍 Form validation state at submission:', {
+      isValid: form.formState.isValid,
+      errors: form.formState.errors,
+      errorCount: Object.keys(form.formState.errors).length
+    })
+    
     try {
       setIsSubmitting(true)
       setSubmitError(null)
 
-      // Validate images
+      // Enhanced validation with detailed error messages
+      const validationErrors: string[] = []
+
       if (images.length === 0) {
-        setSubmitError("Please upload at least one product image")
-        return
+        validationErrors.push("At least one product image is required")
+      }
+
+      if (!data.categoryId) {
+        validationErrors.push("Main category selection is required")
+      }
+
+      if (data.price <= 0) {
+        validationErrors.push("Product price must be greater than 0")
+      }
+
+      if (data.stockQuantity < 0) {
+        validationErrors.push("Stock quantity cannot be negative")
       }
 
       // Validate image files
       for (const image of images) {
         const validation = productsService.validateImage(image.file)
         if (!validation.valid) {
-          setSubmitError(validation.error || "Invalid image file")
-          return
+          validationErrors.push(validation.error || "Invalid image file")
         }
       }
 
-      // Prepare product images for service
+      if (validationErrors.length > 0) {
+        setSubmitError(validationErrors.join(". "))
+        return
+      }
+
+      // Get category details for enhanced payload
+      const selectedCategory = categories.find(c => (c.categoryId || c.id) === data.categoryId)
+      const selectedSubCategory = data.subCategoryId ? subCategories.find(sc => (sc.subCategoryId || sc.id) === data.subCategoryId) : null
+      const selectedSubSubCategory = data.subSubCategoryId ? subSubCategories.find(ssc => (ssc.subSubCategoryId || ssc.id) === data.subSubCategoryId) : null
+
+      // Create enhanced product payload with category hierarchy
+      const enhancedProductPayload = {
+        // Basic Product Information
+        productInfo: {
+          productName: data.productName.trim(),
+          description: data.description.trim(),
+          productDescription: data.productDescription.trim(),
+          productType: data.productType?.trim() || "physical",
+          keyFeatures: data.features.split(",").map((f: string) => f.trim()).filter((f: string) => f.length > 0),
+          specification: data.productSpecification.trim(),
+          boxContents: data.boxContents.trim(),
+          searchKeywords: data.searchKeywords.split(",").map((k: string) => k.trim()).filter((k: string) => k.length > 0),
+        },
+
+        // Pricing and Inventory
+        pricingInfo: {
+          price: Number(data.price),
+          discount: Number(data.discount || 0),
+          finalPrice: Number(data.price) * (1 - (Number(data.discount || 0) / 100)),
+          stockQuantity: Number(data.stockQuantity),
+          inStock: data.stockQuantity > 0, // Calculate based on stock quantity
+          lowStockThreshold: Math.max(5, Math.floor(data.stockQuantity * 0.1)), // 10% of stock or minimum 5
+        },
+
+        // Enhanced Category Information with full hierarchy
+        categoryInfo: {
+          primary: {
+            id: data.categoryId,
+            name: selectedCategory?.name || "",
+            slug: selectedCategory?.slug || "",
+          },
+          secondary: selectedSubCategory ? {
+            id: data.subCategoryId!,
+            name: selectedSubCategory.name,
+            slug: selectedSubCategory.slug,
+            parentId: data.categoryId,
+          } : null,
+          tertiary: selectedSubSubCategory ? {
+            id: data.subSubCategoryId!,
+            name: selectedSubSubCategory.name,
+            slug: selectedSubSubCategory.slug,
+            parentId: data.subCategoryId!,
+          } : null,
+          categoryPath: [
+            selectedCategory?.name,
+            selectedSubCategory?.name,
+            selectedSubSubCategory?.name
+          ].filter(Boolean).join(" > "),
+          categoryIds: [
+            data.categoryId,
+            data.subCategoryId,
+            data.subSubCategoryId
+          ].filter(Boolean),
+        },
+
+        // System Information
+        systemInfo: {
+          createdOn: new Date().toISOString(),
+          createdBy: "current-user", // TODO: Get from auth context
+          status: "pending", // Default status for new products
+          isActive: true,
+          isFeatured: false,
+          imageType: "product",
+          version: "1.0",
+        },
+
+        // Additional metadata
+        metadata: {
+          totalImages: images.length,
+          primaryImageId: images[0]?.id || null,
+          categoryLevel: selectedSubSubCategory ? 3 : selectedSubCategory ? 2 : 1,
+          hasDiscount: (data.discount || 0) > 0,
+          isPhysicalProduct: data.productType !== "digital",
+          estimatedShippingWeight: null, // Can be enhanced later
+          tags: data.searchKeywords.split(",").map((k: string) => k.trim().toLowerCase()).filter((k: string) => k.length > 0),
+        }
+      }
+
+      // Prepare product images with enhanced metadata
       const productImages: ProductImageUpload[] = images.map((image, index) => ({
         id: image.id,
         file: image.file,
         preview: image.preview,
         alt: `${data.productName} - Image ${index + 1}`,
-        isPrimary: index === 0
+        isPrimary: index === 0,
+        order: index,
+        caption: `${data.productName} view ${index + 1}`,
+        size: image.file.size,
+        type: image.file.type,
       }))
 
-      // Convert LocalProductFormData to ProductFormData for the service
-      const productData: ProductFormData = {
+      // Create ProductDto payload that matches backend CreateProductDto
+      const createProductDto = {
+        // Required fields from CreateProductDto
+        productName: data.productName.trim(),
+        description: data.description.trim(),
+        productDescription: data.productDescription.trim(),
+        price: Number(data.price),
+        discount: Number(data.discount || 0),
+        stockQuantity: Number(data.stockQuantity),
+        sku: data.sku?.trim() || "",
+        
+        // Category Information (as Guid strings)
+        categoryId: data.categoryId,
+        categoryName: selectedCategory?.name || "",
+        subCategoryId: data.subCategoryId || null,
+        subCategoryName: selectedSubCategory?.name || null,
+        subSubCategoryId: data.subSubCategoryId || null,
+        subSubCategoryName: selectedSubSubCategory?.name || null,
+        
+        // Product Details with AI extraction support
+        productSpecification: formatProductSpecification(data.productSpecification.trim()),
+        features: formatProductFeatures(data.features.trim()),
+        boxContents: data.boxContents.trim(),
+        productType: data.productType || "physical",
+        
+        // Status & Features
+        isActive: data.isActive,
+        isFeatured: data.isFeatured,
+        status: data.status,
+        
+        // Images (will be populated from uploaded images)
+        imageUrls: images.map(img => img.preview), // Temporary URLs, backend will replace with actual URLs
+        
+        // Required Merchant ID (will be set from JWT token in productsService)
+        merchantID: data.merchantID || "", // Backend will get from _currentUserService.MerchantId
+      }
+
+      // Legacy ProductFormData for backward compatibility (if needed)
+      const legacyProductData: ProductFormData = {
         productName: data.productName,
         description: data.description,
         productDescription: data.productDescription,
         price: data.price,
         stockQuantity: data.stockQuantity,
-        categoryId: data.categoryId,
-        categoryName: data.categoryName,
-        subCategoryId: data.subCategoryId,
-        subCategoryName: data.subCategoryName,
-        subSubCategoryId: data.subSubCategoryId,
-        subSubCategoryName: data.subSubCategoryName,
-        brand: data.brand,
-        model: data.model,
-        color: data.color,
-        size: data.size,
-        weight: data.weight,
-        dimensions: data.dimensions,
-        material: data.material,
-        sku: data.sku,
-        tags: data.tags,
-        isActive: data.isActive ?? true,
-        isFeatured: data.isFeatured ?? false,
-        status: data.status || 'pending'
+        categoryId: 1, // Use a default integer for legacy API (backend should handle GUIDs)
+        categoryName: selectedCategory?.name || "",
+        subCategoryId: data.subCategoryId ? 2 : undefined, // Use default integers
+        subCategoryName: selectedSubCategory?.name || "",
+        subSubCategoryId: data.subSubCategoryId ? 3 : undefined, // Use default integers
+        subSubCategoryName: selectedSubSubCategory?.name || "",
+        productType: data.productType,
+        keyFeatures: data.features, // Map to legacy field name
+        specification: data.productSpecification, // Map to legacy field name
+        box: data.boxContents, // Map to legacy field name
+        searchKeyWord: data.searchKeywords, // Map to legacy field name
+        discount: data.discount,
+        inStock: data.stockQuantity > 0, // Calculate based on stock
+        imageType: "product", // Default value
+        isSaved: false // Default value
       }
 
-      console.log('📝 Submitting product data:', productData)
-      console.log('🖼️ Product images:', productImages.length)
+      console.log('📝 Enhanced Product Payload (CreateProductDto):', createProductDto)
+      console.log('🔄 Legacy Product Data:', legacyProductData)
+      console.log('🖼️ Product Images:', productImages)
 
-      // Call the products service
-      const response = await productsService.createProduct(productData, productImages)
+      // Use new CreateProductDto format
+      const response = await productsService.createProduct(createProductDto, productImages)
 
       console.log('✅ Product created successfully:', response)
       
-      // Show success toast
-      toast({
-        title: "Product Created Successfully!",
-        description: `${data.productName} has been added to your inventory.`,
-        variant: "default",
-        duration: 5000,
+      // Enhanced success feedback with category information
+      const categoryPath = [
+        createProductDto.categoryName,
+        createProductDto.subCategoryName,
+        createProductDto.subSubCategoryName
+      ].filter(Boolean).join(' > ')
+      
+      toast.success("🎉 Product Created Successfully!", {
+        description: `${data.productName} has been added to ${categoryPath || 'Products'}`,
       })
 
       // Reset form and close modal
       form.reset()
       setImages([])
+      setCategories([])
+      setSubCategories([])
+      setSubSubCategories([])
       setActiveTab("basic")
       setOpen(false)
       
       // Cleanup object URLs
       images.forEach(img => URL.revokeObjectURL(img.preview))
       
-      onProductAdded?.(data)
+      // Pass enhanced payload to parent component
+      onProductAdded?.({
+        ...data,
+        enhancedPayload: enhancedProductPayload,
+        categoryPath: enhancedProductPayload.categoryInfo.categoryPath,
+        finalPrice: enhancedProductPayload.pricingInfo.finalPrice,
+      })
       
     } catch (error) {
       console.error('💥 Error adding product:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add product'
+      
+      let errorMessage = 'Failed to add product'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+      
+      // Add more specific error messages
+      if (errorMessage.includes('fetch')) {
+        errorMessage += ' - Check if the API server is running and NEXT_PUBLIC_API_URL is set correctly'
+      }
+      
+      console.error('💥 Full error details:', {
+        error,
+        errorMessage,
+        apiUrl: process.env.NEXT_PUBLIC_API_URL || 'not set',
+        formData: data
+      })
       
       setSubmitError(errorMessage)
       
-      // Show error toast
-      toast({
-        title: "Failed to Create Product",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 7000,
+      // Enhanced error feedback
+      toast.error("❌ Failed to Create Product", {
+        description: `${errorMessage}. Please check console for details.`,
       })
     } finally {
       setIsSubmitting(false)
@@ -312,29 +742,69 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
   }
 
   const handleCategoryChange = (categoryId: string) => {
-    const id = parseInt(categoryId)
-    const category = categories.find(c => c.id === id)
+    const category = categories.find(c => (c.categoryId || c.id) === categoryId)
     
-    form.setValue("categoryId", id)
+    console.log('🏷️ Category selected:', category?.name)
+    
+    // Update form values
+    form.setValue("categoryId", categoryId)
     form.setValue("categoryName", category?.name || "")
-    form.setValue("subCategoryId", undefined)
+    
+    // Clear dependent fields
+    form.setValue("subCategoryId", "")
     form.setValue("subCategoryName", "")
-    form.setValue("subSubCategoryId", undefined)
+    form.setValue("subSubCategoryId", "")
     form.setValue("subSubCategoryName", "")
+    
+    // Clear dependent arrays to trigger re-loading
+    setSubCategories([])
+    setSubSubCategories([])
+    
+    // Show category selected feedback
+    toast.success("🏷️ Category Selected", {
+      description: `✅ Selected: ${category?.name}`,
+    })
   }
 
   const handleSubCategoryChange = (subCategoryId: string) => {
-    const id = parseInt(subCategoryId)
-    const subCategory = subCategories.find(sc => sc.id === id)
+    const subCategory = subCategories.find(sc => (sc.subCategoryId || sc.id) === subCategoryId)
     
-    form.setValue("subCategoryId", id)
+    console.log('🏷️ Subcategory selected:', subCategory?.name)
+    
+    // Update form values
+    form.setValue("subCategoryId", subCategoryId)
     form.setValue("subCategoryName", subCategory?.name || "")
-    form.setValue("subSubCategoryId", undefined)
+    
+    // Clear dependent fields
+    form.setValue("subSubCategoryId", "")
     form.setValue("subSubCategoryName", "")
+    
+    // Clear dependent array
+    setSubSubCategories([])
+    
+    // Show subcategory selected feedback
+    toast.success("📂 Subcategory Selected", {
+      description: `✅ Selected: ${subCategory?.name}`,
+    })
+  }
+
+  const handleSubSubCategoryChange = (subSubCategoryId: string) => {
+    const subSubCategory = subSubCategories.find(ssc => (ssc.subSubCategoryId || ssc.id) === subSubCategoryId)
+    
+    console.log('🏷️ Sub-subcategory selected:', subSubCategory?.name)
+    
+    // Update form values
+    form.setValue("subSubCategoryId", subSubCategoryId)
+    form.setValue("subSubCategoryName", subSubCategory?.name || "")
+    
+    // Show sub-subcategory selected feedback
+    toast.success("📁 Sub-subcategory Selected", {
+      description: `✅ Selected: ${subSubCategory?.name}`,
+    })
   }
 
   const filteredSubCategories = subCategories.filter(
-    sc => sc.parentId === watchedCategoryId
+    sc => sc.categoryId === watchedCategoryId
   )
 
   return (
@@ -556,19 +1026,19 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
 
                       <FormField
                         control={form.control}
-                        name="inStock"
+                        name="isActive"
                         render={({ field }) => (
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                             <FormControl>
                               <Checkbox
-                                checked={field.value}
+                                checked={field.value as boolean}
                                 onCheckedChange={field.onChange}
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">
-                              <FormLabel>In Stock</FormLabel>
+                              <FormLabel>Active Product</FormLabel>
                               <FormDescription>
-                                Check if this product is currently available for purchase
+                                Check if this product is active and available for purchase
                               </FormDescription>
                             </div>
                           </FormItem>
@@ -591,29 +1061,68 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6 pt-0">
+                      {/* Category Selection Progress */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${watchedCategoryId ? 'bg-green-500' : 'bg-gray-300'}`} />
+                            <span className="text-sm font-medium">Main Category</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${watchedSubCategoryId ? 'bg-green-500' : watchedCategoryId && filteredSubCategories.length > 0 ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                            <span className="text-sm font-medium">Subcategory</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${form.watch("subSubCategoryId") ? 'bg-green-500' : watchedSubCategoryId && subSubCategories.length > 0 ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                            <span className="text-sm font-medium">Sub-subcategory</span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Step {watchedCategoryId ? (watchedSubCategoryId ? (form.watch("subSubCategoryId") ? 3 : 2) : 1) : 0} of 3
+                        </div>
+                      </div>
+
                       <div className="grid gap-4 md:grid-cols-3">
                         <FormField
                           control={form.control}
                           name="categoryId"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Main Category *</FormLabel>
+                              <FormLabel className="flex items-center gap-2">
+                                Main Category *
+                                {loadingCategories && <Loader2 className="h-3 w-3 animate-spin" />}
+                              </FormLabel>
                               <Select
                                 onValueChange={(value) => handleCategoryChange(value)}
+                                disabled={loadingCategories}
+                                value={field.value}
                               >
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Select category" />
+                                    <SelectValue placeholder={
+                                      loadingCategories 
+                                        ? "Loading categories..." 
+                                        : field.value 
+                                          ? categories.find(c => (c.categoryId || c.id) === field.value)?.name || "Select category"
+                                          : "Select category"
+                                    } />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                   {categories.map((category) => (
-                                    <SelectItem key={category.id} value={category.id.toString()}>
+                                    <SelectItem key={category.categoryId || category.id} value={category.categoryId || category.id}>
                                       {category.name}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
+                              {/* Show selected category */}
+                              {field.value && (
+                                <div className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                                  <Check className="h-3 w-3" />
+                                  <span>Selected: {categories.find(c => (c.categoryId || c.id) === field.value)?.name}</span>
+                                </div>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -624,24 +1133,45 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                           name="subCategoryId"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Subcategory</FormLabel>
+                              <FormLabel className="flex items-center gap-2">
+                                Subcategory
+                                {loadingSubCategories && <Loader2 className="h-3 w-3 animate-spin" />}
+                              </FormLabel>
                               <Select
                                 onValueChange={(value) => handleSubCategoryChange(value)}
-                                disabled={!watchedCategoryId || filteredSubCategories.length === 0}
+                                disabled={!watchedCategoryId || loadingSubCategories || filteredSubCategories.length === 0}
+                                value={field.value || ""}
                               >
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Select subcategory" />
+                                    <SelectValue placeholder={
+                                      !watchedCategoryId 
+                                        ? "Select category first"
+                                        : loadingSubCategories 
+                                          ? "Loading subcategories..." 
+                                          : filteredSubCategories.length === 0
+                                            ? "No subcategories available"
+                                            : field.value
+                                              ? filteredSubCategories.find(sc => sc.subCategoryId === field.value)?.name || "Select subcategory"
+                                              : "Select subcategory"
+                                    } />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                   {filteredSubCategories.map((subCategory) => (
-                                    <SelectItem key={subCategory.id} value={subCategory.id.toString()}>
+                                    <SelectItem key={subCategory.subCategoryId || subCategory.id} value={subCategory.subCategoryId || subCategory.id}>
                                       {subCategory.name}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
+                              {/* Show selected subcategory */}
+                              {field.value && filteredSubCategories.length > 0 && (
+                                <div className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                                  <Check className="h-3 w-3" />
+                                  <span>Selected: {filteredSubCategories.find(sc => sc.subCategoryId === field.value)?.name}</span>
+                                </div>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -649,22 +1179,108 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
 
                         <FormField
                           control={form.control}
-                          name="subSubCategoryName"
+                          name="subSubCategoryId"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Sub-Subcategory</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Optional sub-category" {...field} />
-                              </FormControl>
+                              <FormLabel className="flex items-center gap-2">
+                                Sub-Subcategory
+                                {loadingSubSubCategories && <Loader2 className="h-3 w-3 animate-spin" />}
+                              </FormLabel>
+                              <Select
+                                onValueChange={(value) => handleSubSubCategoryChange(value)}
+                                disabled={!watchedSubCategoryId || loadingSubSubCategories || subSubCategories.length === 0}
+                                value={field.value || ""}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder={
+                                      !watchedSubCategoryId 
+                                        ? "Select subcategory first"
+                                        : loadingSubSubCategories 
+                                          ? "Loading sub-subcategories..." 
+                                          : subSubCategories.length === 0
+                                            ? "No sub-subcategories available"
+                                            : field.value
+                                              ? subSubCategories.find(ssc => (ssc.subSubCategoryId || ssc.id) === field.value)?.name || "Select sub-subcategory"
+                                              : "Select sub-subcategory"
+                                    } />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {subSubCategories.map((subSubCategory) => (
+                                    <SelectItem key={subSubCategory.subSubCategoryId || subSubCategory.id} value={subSubCategory.subSubCategoryId || subSubCategory.id}>
+                                      {subSubCategory.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {/* Show selected sub-subcategory */}
+                              {field.value && subSubCategories.length > 0 && (
+                                <div className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                                  <Check className="h-3 w-3" />
+                                  <span>Selected: {subSubCategories.find(ssc => (ssc.subSubCategoryId || ssc.id) === field.value)?.name}</span>
+                                </div>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
 
+                      {/* Category Hierarchy Display */}
+                      {watchedCategoryId && (
+                        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Tag className="h-4 w-4 text-blue-600" />
+                            <h4 className="text-sm font-semibold text-blue-900">Category Hierarchy</h4>
+                          </div>
+                          
+                          {/* Breadcrumb Style Category Path */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 rounded-md">
+                              <span className="text-xs font-medium text-blue-800">
+                                {categories.find(c => (c.categoryId || c.id) === watchedCategoryId)?.name}
+                              </span>
+                            </div>
+                            
+                            {watchedSubCategoryId && (
+                              <>
+                                <span className="text-blue-400">→</span>
+                                <div className="flex items-center gap-1 px-3 py-1.5 bg-indigo-100 rounded-md">
+                                  <span className="text-xs font-medium text-indigo-800">
+                                    {subCategories.find(sc => (sc.subCategoryId || sc.id) === watchedSubCategoryId)?.name}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                            
+                            {form.watch("subSubCategoryId") && (
+                              <>
+                                <span className="text-blue-400">→</span>
+                                <div className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 rounded-md">
+                                  <span className="text-xs font-medium text-purple-800">
+                                    {subSubCategories.find(ssc => ssc.id === form.watch("subSubCategoryId"))?.name}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          
+                          {/* Category Path Info */}
+                          <div className="mt-3 text-xs text-blue-600">
+                            <span className="font-medium">Category Path:</span> {' '}
+                            <span>
+                              {categories.find(c => (c.categoryId || c.id) === watchedCategoryId)?.name}
+                              {watchedSubCategoryId && ` > ${subCategories.find(sc => (sc.subCategoryId || sc.id) === watchedSubCategoryId)?.name}`}
+                              {form.watch("subSubCategoryId") && ` > ${subSubCategories.find(ssc => ssc.id === form.watch("subSubCategoryId"))?.name}`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       <FormField
                         control={form.control}
-                        name="searchKeyWord"
+                        name="searchKeywords"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Search Keywords *</FormLabel>
@@ -672,7 +1288,8 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                               <Textarea 
                                 placeholder="Add relevant keywords separated by commas (e.g., smartphone, mobile, android, phone)"
                                 className="min-h-[80px]"
-                                {...field} 
+                                {...field}
+                                value={field.value as string}
                               />
                             </FormControl>
                             <FormDescription>
@@ -701,7 +1318,7 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                         <CardContent className="space-y-6 pt-0">
                       <FormField
                         control={form.control}
-                        name="keyFeatures"
+                        name="features"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Key Features *</FormLabel>
@@ -709,11 +1326,90 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                               <Textarea 
                                 placeholder="• Feature 1&#10;• Feature 2&#10;• Feature 3"
                                 className="min-h-[120px]"
-                                {...field} 
+                                {...field}
+                                value={field.value as string}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const textarea = e.target as HTMLTextAreaElement;
+                                    const cursorPos = textarea.selectionStart;
+                                    const textBefore = textarea.value.substring(0, cursorPos);
+                                    const textAfter = textarea.value.substring(cursorPos);
+                                    
+                                    // Add new line with bullet point
+                                    const newValue = textBefore + '\n• ' + textAfter;
+                                    field.onChange(newValue);
+                                    
+                                    // Set cursor position after the bullet
+                                    setTimeout(() => {
+                                      textarea.selectionStart = textarea.selectionEnd = cursorPos + 3;
+                                      textarea.focus();
+                                    }, 0);
+                                  }
+                                }}
+                                onPaste={(e) => {
+                                  e.preventDefault();
+                                  const pasteData = e.clipboardData?.getData('text') || '';
+                                  
+                                  if (pasteData.trim()) {
+                                    // Split pasted text into lines and format as bullets
+                                    const lines = pasteData
+                                      .split('\n')
+                                      .map(line => line.trim())
+                                      .filter(line => line.length > 0)
+                                      .map(line => {
+                                        // Remove existing bullets/numbers/dashes
+                                        const cleaned = line.replace(/^[•\-\*\+\d+\.\)\]]\s*/, '').trim();
+                                        return cleaned ? `• ${cleaned}` : '';
+                                      })
+                                      .filter(line => line.length > 0);
+                                    
+                                    const formattedText = lines.join('\n');
+                                    
+                                    // If there's existing content, append with newline
+                                    const currentValue = field.value as string || '';
+                                    const finalValue = currentValue.trim() 
+                                      ? `${currentValue}\n${formattedText}` 
+                                      : formattedText;
+                                    
+                                    field.onChange(finalValue);
+                                    
+                                    toast.success(`Organized ${lines.length} feature${lines.length !== 1 ? 's' : ''} into bullet points!`);
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  
+                                  // Auto-add bullet to first line if it doesn't start with one and isn't empty
+                                  if (value.trim() && !value.startsWith('•') && !value.startsWith('-') && !value.startsWith('*')) {
+                                    // Only auto-add bullet if it's a single line starting fresh
+                                    const lines = value.split('\n');
+                                    if (lines.length === 1 && !value.includes('\n')) {
+                                      field.onChange(`• ${value}`);
+                                      return;
+                                    }
+                                  }
+                                  
+                                  field.onChange(value);
+                                }}
                               />
                             </FormControl>
-                            <FormDescription>
-                              List the main selling points and features of your product
+                            <FormDescription className="flex items-center justify-between">
+                              <span>List the main selling points and features of your product. Press Enter for new bullets.</span>
+                              {(() => {
+                                try {
+                                  const parsed = JSON.parse(field.value as string || '{}');
+                                  if (parsed._format === "structured") {
+                                    return (
+                                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full flex items-center gap-1">
+                                        <Sparkles className="h-3 w-3" />
+                                        AI Structured
+                                      </span>
+                                    );
+                                  }
+                                } catch {}
+                                return null;
+                              })()}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -722,28 +1418,368 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
 
                       <FormField
                         control={form.control}
-                        name="specification"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Technical Specifications *</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Dimensions: 15cm x 10cm x 5cm&#10;Weight: 200g&#10;Material: Aluminum&#10;Color: Space Gray"
-                                className="min-h-[120px]"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Detailed technical specifications and measurements
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        name="productSpecification"
+                        render={({ field }) => {
+                          // Parse current specifications into key-value pairs
+                          const parseSpecs = (value: string): Array<{key: string, value: string, id: string}> => {
+                            if (!value) return [{key: '', value: '', id: '1'}];
+                            
+                            try {
+                              // Try parsing as structured JSON first
+                              const parsed = JSON.parse(value);
+                              if (parsed._format === "structured" && parsed.ProductSpecifications) {
+                                return Object.entries(parsed.ProductSpecifications).map(([key, val], index) => ({
+                                  key,
+                                  value: val as string,
+                                  id: (index + 1).toString()
+                                }));
+                              }
+                            } catch {}
+                            
+                            // Parse as text format (Key: Value lines)
+                            const lines = value.split('\n').filter(line => line.trim());
+                            const specs = lines.map((line, index) => {
+                              const colonIndex = line.indexOf(':');
+                              if (colonIndex > 0) {
+                                return {
+                                  key: line.substring(0, colonIndex).trim(),
+                                  value: line.substring(colonIndex + 1).trim(),
+                                  id: (index + 1).toString()
+                                };
+                              }
+                              return { key: '', value: line.trim(), id: (index + 1).toString() };
+                            });
+                            
+                            return specs.length > 0 ? specs : [{key: '', value: '', id: '1'}];
+                          };
+                          
+                          // Convert specs back to text format for the form field
+                          const specsToText = (specs: Array<{key: string, value: string}>) => {
+                            return specs
+                              .filter(spec => spec.key.trim() || spec.value.trim())
+                              .map(spec => spec.key.trim() ? `${spec.key}: ${spec.value}` : spec.value)
+                              .join('\n');
+                          };
+                          
+                          const [specs, setSpecs] = useState(() => parseSpecs(field.value as string || ''));
+                          const [inputMode, setInputMode] = useState<'pairs' | 'text'>('pairs');
+                          
+                          // Update form field when specs change
+                          useEffect(() => {
+                            const textValue = specsToText(specs);
+                            if (textValue !== field.value) {
+                              field.onChange(textValue);
+                            }
+                          }, [specs, field]);
+                          
+                          const addSpecPair = () => {
+                            const newId = (specs.length + 1).toString();
+                            setSpecs([...specs, { key: '', value: '', id: newId }]);
+                          };
+                          
+                          const removeSpecPair = (id: string) => {
+                            if (specs.length > 1) {
+                              setSpecs(specs.filter(spec => spec.id !== id));
+                            }
+                          };
+                          
+                          const updateSpec = (id: string, key: string, value: string) => {
+                            setSpecs(specs.map(spec => 
+                              spec.id === id ? { ...spec, key, value } : spec
+                            ));
+                          };
+                          
+                          return (
+                            <FormItem>
+                              <div className="flex items-center justify-between">
+                                <FormLabel>Technical Specifications *</FormLabel>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setInputMode(inputMode === 'pairs' ? 'text' : 'pairs')}
+                                    className="text-xs"
+                                  >
+                                    {inputMode === 'pairs' ? 'Switch to Text' : 'Switch to Pairs'}
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              <FormControl>
+                                {inputMode === 'pairs' ? (
+                                  <div className="space-y-3 p-4 border border-gray-200 rounded-lg bg-gray-50/30">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-medium text-gray-700">
+                                        Specification Key-Value Pairs
+                                      </span>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={addSpecPair}
+                                        className="text-xs"
+                                      >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Add Spec
+                                      </Button>
+                                    </div>
+                                    
+                                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                                      {specs.map((spec, index) => (
+                                        <div key={spec.id} className="flex gap-2 items-center">
+                                          <Input
+                                            placeholder="Property (e.g., Weight, Dimensions)"
+                                            value={spec.key}
+                                            onChange={(e) => updateSpec(spec.id, e.target.value, spec.value)}
+                                            className="flex-1 h-9 text-sm"
+                                          />
+                                          <span className="text-gray-500">:</span>
+                                          <Input
+                                            placeholder="Value (e.g., 200g, 15cm x 10cm)"
+                                            value={spec.value}
+                                            onChange={(e) => updateSpec(spec.id, spec.key, e.target.value)}
+                                            className="flex-1 h-9 text-sm"
+                                          />
+                                          {specs.length > 1 && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => removeSpecPair(spec.id)}
+                                              className="h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    
+                                    {specs.length === 0 && (
+                                      <div className="text-center py-4 text-gray-500 text-sm">
+                                        No specifications added. Click "Add Spec" to get started.
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <Textarea 
+                                    placeholder="Dimensions: 15cm x 10cm x 5cm&#10;Weight: 200g&#10;Material: Aluminum&#10;Color: Space Gray"
+                                    className="min-h-[120px]"
+                                    value={field.value as string}
+                                    onChange={(e) => {
+                                      field.onChange(e.target.value);
+                                      setSpecs(parseSpecs(e.target.value));
+                                    }}
+                                    onPaste={(e) => {
+                                      // Auto-format pasted specifications
+                                      const pasteData = e.clipboardData?.getData('text') || '';
+                                      if (pasteData.trim()) {
+                                        const lines = pasteData.split('\n')
+                                          .map(line => line.trim())
+                                          .filter(line => line.length > 0)
+                                          .map(line => {
+                                            // If line doesn't contain colon, try to format it
+                                            if (!line.includes(':') && line.includes(' ')) {
+                                              const words = line.split(' ');
+                                              if (words.length >= 2) {
+                                                const key = words[0];
+                                                const value = words.slice(1).join(' ');
+                                                return `${key}: ${value}`;
+                                              }
+                                            }
+                                            return line;
+                                          })
+                                          .join('\n');
+                                        
+                                        setTimeout(() => {
+                                          setSpecs(parseSpecs(lines));
+                                          toast.success('Specifications formatted automatically!');
+                                        }, 100);
+                                      }
+                                    }}
+                                  />
+                                )}
+                              </FormControl>
+                              
+                              <FormDescription className="flex items-center justify-between">
+                                <span>
+                                  {inputMode === 'pairs' 
+                                    ? 'Add key-value pairs for technical specifications' 
+                                    : 'Detailed technical specifications and measurements (Key: Value format)'
+                                  }
+                                </span>
+                                {(() => {
+                                  try {
+                                    const parsed = JSON.parse(field.value as string || '{}');
+                                    if (parsed._format === "structured") {
+                                      return (
+                                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full flex items-center gap-1">
+                                          <Sparkles className="h-3 w-3" />
+                                          AI Structured
+                                        </span>
+                                      );
+                                    }
+                                  } catch {}
+                                  
+                                  // Show count for pairs mode
+                                  if (inputMode === 'pairs') {
+                                    const validSpecs = specs.filter(spec => spec.key.trim() || spec.value.trim());
+                                    return validSpecs.length > 0 ? (
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full flex items-center gap-1">
+                                        <FileText className="h-3 w-3" />
+                                        {validSpecs.length} spec{validSpecs.length !== 1 ? 's' : ''}
+                                      </span>
+                                    ) : null;
+                                  }
+                                  
+                                  return null;
+                                })()}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
+
+                      {/* AI Text Extraction Utility */}
+                      {/* <Card className="border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base font-semibold text-purple-900 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-purple-600" />
+                            AI Text Extraction
+                          </CardTitle>
+                          <CardDescription className="text-purple-700">
+                            Paste product description text and let AI extract structured specifications and features
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium text-purple-900 mb-2 block">
+                              Raw Product Text
+                            </label>
+                            <Textarea
+                              placeholder="Paste your product description text here...&#10;&#10;Example:&#10;Brand: Apple&#10;Model: iPhone 15 Pro&#10;Storage: 256GB&#10;Display: 6.1-inch Super Retina XDR&#10;• Advanced camera system&#10;• All-day battery life&#10;• Water resistant up to 6 meters"
+                              className="min-h-[100px] border-purple-200 focus:border-purple-400"
+                              value={rawText}
+                              onChange={(e) => setRawText(e.target.value)}
+                            />
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                if (!rawText.trim()) {
+                                  toast.error("Please paste some product text to extract information from.");
+                                  return;
+                                }
+                                
+                                const extracted = extractProductInfo(rawText);
+                                
+                                // Option 1: Fill with formatted text (current approach)
+                                const specsText = Object.entries(extracted.ProductSpecifications)
+                                  .map(([key, value]) => `${key}: ${value}`)
+                                  .join('\n');
+                                
+                                const featuresText = extracted.ProductFeatures
+                                  .map(feature => `• ${feature}`)
+                                  .join('\n');
+                                
+                                // Set form values with formatted text
+                                if (specsText) {
+                                  form.setValue('productSpecification', specsText);
+                                }
+                                if (featuresText) {
+                                  form.setValue('features', featuresText);
+                                }
+                                
+                                toast.success(`AI Extraction Complete! Extracted ${Object.keys(extracted.ProductSpecifications).length} specifications and ${extracted.ProductFeatures.length} features.`);
+                              }}
+                              className="bg-purple-600 hover:bg-purple-700 text-white"
+                              disabled={!rawText.trim()}
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Extract & Fill
+                            </Button>
+                            
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                if (!rawText.trim()) {
+                                  toast.error("Please paste some product text to extract information from.");
+                                  return;
+                                }
+                                
+                                const extracted = extractProductInfo(rawText);
+                                
+                                // Option 2: Fill with structured JSON (for advanced backend processing)
+                                const structuredSpecs = JSON.stringify({
+                                  ProductSpecifications: extracted.ProductSpecifications,
+                                  _format: "structured" // Metadata for backend detection
+                                });
+                                
+                                const structuredFeatures = JSON.stringify({
+                                  ProductFeatures: extracted.ProductFeatures,
+                                  _format: "structured" // Metadata for backend detection  
+                                });
+                                
+                                // Set form values with structured JSON
+                                if (Object.keys(extracted.ProductSpecifications).length > 0) {
+                                  form.setValue('productSpecification', structuredSpecs);
+                                }
+                                if (extracted.ProductFeatures.length > 0) {
+                                  form.setValue('features', structuredFeatures);
+                                }
+                                
+                                toast.success(`Structured data filled! ${Object.keys(extracted.ProductSpecifications).length} specs + ${extracted.ProductFeatures.length} features as JSON.`);
+                              }}
+                              variant="outline"
+                              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                              disabled={!rawText.trim()}
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Fill as JSON
+                            </Button>
+                            
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                if (!rawText.trim()) return;
+                                
+                                const extracted = extractProductInfo(rawText);
+                                const result = {
+                                  ProductSpecifications: extracted.ProductSpecifications,
+                                  ProductFeatures: extracted.ProductFeatures
+                                };
+                                
+                                // Copy to clipboard
+                                navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+                                toast.success("JSON copied to clipboard! Structured data is ready to use.");
+                              }}
+                              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                              disabled={!rawText.trim()}
+                            >
+                              Copy JSON
+                            </Button>
+                          </div>
+                          
+                          <div className="text-xs text-purple-600 space-y-1">
+                            <p><strong>How it works:</strong></p>
+                            <ul className="list-disc list-inside space-y-0.5 ml-2">
+                              <li>Identifies specifications from "Key: Value" patterns</li>
+                              <li>Extracts features from bullet points and descriptive text</li>
+                              <li>Automatically fills the form fields above</li>
+                              <li>Outputs structured JSON for external use</li>
+                            </ul>
+                          </div>
+                        </CardContent>
+                      </Card> */}
 
                       <FormField
                         control={form.control}
-                        name="box"
+                        name="boxContents"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>What's in the Box *</FormLabel>
@@ -751,11 +1787,86 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                               <Textarea 
                                 placeholder="• 1x Product&#10;• 1x User Manual&#10;• 1x USB Cable&#10;• 1x Warranty Card"
                                 className="min-h-[100px]"
-                                {...field} 
+                                {...field}
+                                value={field.value as string}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const textarea = e.target as HTMLTextAreaElement;
+                                    const cursorPos = textarea.selectionStart;
+                                    const textBefore = textarea.value.substring(0, cursorPos);
+                                    const textAfter = textarea.value.substring(cursorPos);
+                                    
+                                    // Add new line with bullet point
+                                    const newValue = textBefore + '\n• ' + textAfter;
+                                    field.onChange(newValue);
+                                    
+                                    // Set cursor position after the bullet
+                                    setTimeout(() => {
+                                      textarea.selectionStart = textarea.selectionEnd = cursorPos + 3;
+                                      textarea.focus();
+                                    }, 0);
+                                  }
+                                }}
+                                onPaste={(e) => {
+                                  e.preventDefault();
+                                  const pasteData = e.clipboardData?.getData('text') || '';
+                                  
+                                  if (pasteData.trim()) {
+                                    // Split pasted text into lines and format as bullets
+                                    const lines = pasteData
+                                      .split('\n')
+                                      .map(line => line.trim())
+                                      .filter(line => line.length > 0)
+                                      .map(line => {
+                                        // Remove existing bullets/numbers/dashes and clean formatting
+                                        const cleaned = line
+                                          .replace(/^[•\-\*\+\d+\.\)\]]\s*/, '') // Remove list markers
+                                          .replace(/^\d+x?\s+/i, '') // Remove quantity prefixes like "1x" or "2 "
+                                          .trim();
+                                        
+                                        // Add quantity prefix if it looks like an item without one
+                                        if (cleaned && !cleaned.match(/^\d+x?\s/i)) {
+                                          return `• 1x ${cleaned}`;
+                                        }
+                                        return cleaned ? `• ${cleaned}` : '';
+                                      })
+                                      .filter(line => line.length > 0);
+                                    
+                                    const formattedText = lines.join('\n');
+                                    
+                                    // If there's existing content, append with newline
+                                    const currentValue = field.value as string || '';
+                                    const finalValue = currentValue.trim() 
+                                      ? `${currentValue}\n${formattedText}` 
+                                      : formattedText;
+                                    
+                                    field.onChange(finalValue);
+                                    
+                                    toast.success(`Organized ${lines.length} item${lines.length !== 1 ? 's' : ''} into box contents!`);
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  
+                                  // Auto-add bullet to first line if it doesn't start with one and isn't empty
+                                  if (value.trim() && !value.startsWith('•') && !value.startsWith('-') && !value.startsWith('*')) {
+                                    // Only auto-add bullet if it's a single line starting fresh
+                                    const lines = value.split('\n');
+                                    if (lines.length === 1 && !value.includes('\n')) {
+                                      // Smart quantity detection - add "1x " if it doesn't start with a number
+                                      const smartValue = value.match(/^\d+x?\s/i) ? value : `1x ${value}`;
+                                      field.onChange(`• ${smartValue}`);
+                                      return;
+                                    }
+                                  }
+                                  
+                                  field.onChange(value);
+                                }}
                               />
                             </FormControl>
                             <FormDescription>
-                              List all items included in the product package
+                              List all items included in the product package. Press Enter for new items.
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -871,6 +1982,13 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                     type="submit" 
                     className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 font-medium shadow-md" 
                     disabled={isSubmitting}
+                    onClick={() => {
+                      console.log('🔍 Form submit button clicked!')
+                      console.log('📝 Form state:', {
+                        isValid: form.formState.isValid,
+                        errors: form.formState.errors
+                      })
+                    }}
                   >
                     {isSubmitting ? (
                       <>

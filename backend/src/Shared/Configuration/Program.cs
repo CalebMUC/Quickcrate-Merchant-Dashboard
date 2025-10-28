@@ -1,6 +1,6 @@
 using MerchantService.Data;
 using MerchantService.Model.Auth;
-using MerchantService.Shared.Extensions;
+using MerchantService.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -79,6 +79,7 @@ builder.Services.AddAuthorization(options =>
 // Add Application Services
 builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.AddCategoriesServices();
+builder.Services.AddProductServices();
 
 // Add Controllers
 builder.Services.AddControllers();
@@ -91,12 +92,12 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Quickcrate Merchant API",
+        Title = "QuickCrate Merchant API - Product Management",
         Version = "v1",
-        Description = "API for Quickcrate Merchant Dashboard",
+        Description = "Comprehensive Product Management API for QuickCrate Merchant Dashboard with full CRUD operations, search, filtering, analytics, and bulk operations",
         Contact = new OpenApiContact
         {
-            Name = "Quickcrate Support",
+            Name = "QuickCrate Support",
             Email = "support@quickcrate.com"
         }
     });
