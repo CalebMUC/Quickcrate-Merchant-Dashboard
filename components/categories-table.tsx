@@ -70,13 +70,19 @@ function CategoryImage({ imageUrl, name }: { imageUrl?: string; name: string }) 
 export function CategoriesTable({
   categories,
   openEditCategory,
+  openEditSubCategory,
+  openEditSubSubCategory,
   openAddSubCategory,
+  openAddSubSubCategory,
   confirmDelete,
   loading,
 }: {
   categories: any[]
   openEditCategory: (cat: any) => void
+  openEditSubCategory?: (subCat: any) => void
+  openEditSubSubCategory?: (subSubCat: any) => void
   openAddSubCategory: (id: string) => void
+  openAddSubSubCategory?: (id: string) => void
   confirmDelete: (type: 'category' | 'subcategory' | 'subsubcategory', id: string, name: string) => void
   loading: boolean
 }) {
@@ -139,189 +145,379 @@ export function CategoriesTable({
 
             <TableBody>
               {filteredCategories.map((category, index) => (
-                <TableRow
-                  key={category.categoryId}
-                  className="hover:bg-muted/30 transition-colors group"
-                  style={{
-                    animationDelay: `${index * 50}ms`,
-                  }}
-                >
-                  {/* Name */}
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      {/* Category Image */}
-                      <div className="relative flex-shrink-0">
-                        <CategoryImage
-                          imageUrl={category.imageUrl}
-                          name={category.name}
-                        />
-                        <div className="absolute inset-0 w-10 h-10 rounded-lg bg-blue-400/20 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      
-                      {/* Category Info */}
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium group-hover:text-blue-600 transition-colors truncate">
-                          {category.name}
+                <>
+                  {/* Main Category Row */}
+                  <TableRow
+                    key={category.categoryId}
+                    className="hover:bg-muted/30 transition-colors group"
+                    style={{
+                      animationDelay: `${index * 50}ms`,
+                    }}
+                  >
+                    {/* Name */}
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {/* Category Image */}
+                        <div className="relative flex-shrink-0">
+                          <CategoryImage
+                            imageUrl={category.imageUrl}
+                            name={category.name}
+                          />
+                          <div className="absolute inset-0 w-10 h-10 rounded-lg bg-blue-400/20 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {category.slug || 'No slug'}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  {/* Description */}
-                  <TableCell>
-                    {category.description ? (
-                      <div className="relative group">
-                        <p className="text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors max-w-xs">
-                          {category.description.length > 50 
-                            ? `${category.description.substring(0, 30)}...`
-                            : category.description
-                          }
-                        </p>
-                        {category.description.length > 50 && (
-                          <div className="absolute z-50 invisible group-hover:visible bg-popover border border-border rounded-md p-3 shadow-lg max-w-sm -top-2 left-0 transform -translate-y-full">
-                            <p className="text-sm text-popover-foreground whitespace-pre-wrap break-words">
-                              {category.description}
-                            </p>
-                            <div className="absolute top-full left-4 w-2 h-2 bg-popover border-r border-b border-border transform rotate-45 -translate-y-1"></div>
+                        
+                        {/* Category Info */}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium group-hover:text-blue-600 transition-colors truncate">
+                            {category.name}
                           </div>
-                        )}
+                          <div className="text-sm text-muted-foreground truncate">
+                            {category.slug || 'No slug'}
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="italic text-muted-foreground text-sm">No description</span>
-                    )}
-                  </TableCell>
+                    </TableCell>
 
-                  {/* Slug */}
-                  <TableCell>
-                    <code className="text-xs bg-muted/60 group-hover:bg-muted px-2 py-1 rounded font-mono transition-colors">
-                      {category.slug || <span className="italic text-muted-foreground">No slug</span>}
-                    </code>
-                  </TableCell>
+                    {/* Description */}
+                    <TableCell>
+                      {category.description ? (
+                        <div className="relative group">
+                          <p className="text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors max-w-xs">
+                            {category.description.length > 50 
+                              ? `${category.description.substring(0, 30)}...`
+                              : category.description
+                            }
+                          </p>
+                          {category.description.length > 50 && (
+                            <div className="absolute z-50 invisible group-hover:visible bg-popover border border-border rounded-md p-3 shadow-lg max-w-sm -top-2 left-0 transform -translate-y-full">
+                              <p className="text-sm text-popover-foreground whitespace-pre-wrap break-words">
+                                {category.description}
+                              </p>
+                              <div className="absolute top-full left-4 w-2 h-2 bg-popover border-r border-b border-border transform rotate-45 -translate-y-1"></div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="italic text-muted-foreground text-sm">No description</span>
+                      )}
+                    </TableCell>
 
-                  {/* Parent */}
-                  <TableCell>
-                    {category.parentId ? (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        <Folder className="h-3 w-3 mr-1" />
-                        Subcategory
-                      </Badge>
-                    ) : (
+                    {/* Slug */}
+                    <TableCell>
+                      <code className="text-xs bg-muted/60 group-hover:bg-muted px-2 py-1 rounded font-mono transition-colors">
+                        {category.slug || <span className="italic text-muted-foreground">No slug</span>}
+                      </code>
+                    </TableCell>
+
+                    {/* Parent */}
+                    <TableCell>
                       <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                         <Tag className="h-3 w-3 mr-1" />
                         Root
                       </Badge>
-                    )}
-                  </TableCell>
+                    </TableCell>
 
-                  {/* Status */}
-                  <TableCell>
-                    {category.isActive ? (
-                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20">
-                        <Eye className="h-3 w-3 mr-1" />
-                        Active
+                    {/* Status */}
+                    <TableCell>
+                      {category.isActive ? (
+                        <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20">
+                          <EyeOff className="h-3 w-3 mr-1" />
+                          Inactive
+                        </Badge>
+                      )}
+                    </TableCell>
+
+                    {/* Sort */}
+                    <TableCell className="text-center font-medium">
+                      {category.sortOrder ?? 0}
+                    </TableCell>
+
+                    {/* Products */}
+                    <TableCell className="text-center">
+                      <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-default">
+                        <Tag className="h-3 w-3 mr-1" />
+                        {category.productCount || 0}
                       </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20">
-                        <EyeOff className="h-3 w-3 mr-1" />
-                        Inactive
+                    </TableCell>
+
+                    {/* Subcategories */}
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className="text-xs hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 transition-colors cursor-default">
+                        <Folder className="h-3 w-3 mr-1" />
+                        {category.subcategories?.length || 0}
                       </Badge>
-                    )}
-                  </TableCell>
+                    </TableCell>
 
-                  {/* Sort */}
-                  <TableCell className="text-center font-medium">
-                    {category.sortOrder ?? 0}
-                  </TableCell>
+                    {/* Actions */}
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Add Subcategory Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-green-100 hover:text-green-600 hover:scale-110"
+                          onClick={() => openAddSubCategory(category.categoryId || category.id)}
+                          title="Add Subcategory"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Edit Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-100 hover:text-blue-600 hover:scale-110"
+                          onClick={() => openEditCategory(category)}
+                          title="Edit Category"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Delete Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-100 hover:text-red-600 hover:scale-110"
+                          onClick={() => confirmDelete("category", category.categoryId || category.id, category.name)}
+                          title="Delete Category"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* More Actions Dropdown */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                              title="More Actions"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => openEditCategory(category)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Category
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openAddSubCategory(category.categoryId || category.id)}>
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Subcategory
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => confirmDelete("category", category.categoryId || category.id, category.name)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Category
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
 
-                  {/* Products */}
-                  <TableCell className="text-center">
-                    <Badge variant="secondary" className="text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-default">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {category.productCount || 0}
-                    </Badge>
-                  </TableCell>
-
-                  {/* Subcategories */}
-                  <TableCell className="text-center">
-                    <Badge variant="outline" className="text-xs hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 transition-colors cursor-default">
-                      <Folder className="h-3 w-3 mr-1" />
-                      {category.subcategories?.length || 0}
-                    </Badge>
-                  </TableCell>
-
-                  {/* Actions */}
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      {/* Add Subcategory Button */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-green-100 hover:text-green-600 hover:scale-110"
-                        onClick={() => openAddSubCategory(category.categoryId || category.id)}
-                        title="Add Subcategory"
+                  {/* Subcategories Rows */}
+                  {category.subcategories?.map((subcategory: any, subIndex: number) => (
+                    <>
+                      <TableRow
+                        key={`sub-${subcategory.id}`}
+                        className="hover:bg-muted/30 transition-colors group bg-blue-50/30"
                       >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      
-                      {/* Edit Button */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-100 hover:text-blue-600 hover:scale-110"
-                        onClick={() => openEditCategory(category)}
-                        title="Edit Category"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      
-                      {/* Delete Button */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-100 hover:text-red-600 hover:scale-110"
-                        onClick={() => confirmDelete("category", category.categoryId || category.id, category.name)}
-                        title="Delete Category"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      
-                      {/* More Actions Dropdown (backup) */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
-                            title="More Actions"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openEditCategory(category)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Category
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openAddSubCategory(category.categoryId || category.id)}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Subcategory
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-red-600 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => confirmDelete("category", category.categoryId || category.id, category.name)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Category
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                        <TableCell>
+                          <div className="flex items-center gap-3 pl-8">
+                            <div className="w-4 h-px bg-border"></div>
+                            <div className="relative flex-shrink-0">
+                              <CategoryImage
+                                imageUrl={subcategory.imageUrl}
+                                name={subcategory.name}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium group-hover:text-blue-600 transition-colors truncate text-sm">
+                                {subcategory.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {subcategory.slug || 'No slug'}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-xs text-muted-foreground">
+                            {subcategory.description || 'No description'}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted/60 px-1 py-0.5 rounded font-mono">
+                            {subcategory.slug || '-'}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                            <Folder className="h-2 w-2 mr-1" />
+                            Subcategory
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {subcategory.isActive ? (
+                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
+                              <Eye className="h-2 w-2 mr-1" />
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 text-xs">
+                              <EyeOff className="h-2 w-2 mr-1" />
+                              Inactive
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center text-xs">
+                          {subcategory.sortOrder ?? 0}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="text-xs">
+                            {subcategory.productCount || 0}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="text-xs">
+                            {subcategory.subSubCategories?.length || 0}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            {openAddSubSubCategory && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-green-100 hover:text-green-600"
+                                onClick={() => openAddSubSubCategory(subcategory.id)}
+                                title="Add Sub-Subcategory"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            )}
+                            {openEditSubCategory && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-100 hover:text-blue-600"
+                                onClick={() => openEditSubCategory(subcategory)}
+                                title="Edit Subcategory"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-100 hover:text-red-600"
+                              onClick={() => confirmDelete("subcategory", subcategory.id, subcategory.name)}
+                              title="Delete Subcategory"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Sub-Subcategories Rows */}
+                      {subcategory.subSubCategories?.map((subSubCategory: any) => (
+                        <TableRow
+                          key={`subsub-${subSubCategory.id}`}
+                          className="hover:bg-muted/30 transition-colors group bg-purple-50/30"
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-3 pl-16">
+                              <div className="w-4 h-px bg-border"></div>
+                              <div className="w-6 h-6 rounded bg-muted/60 flex items-center justify-center">
+                                <Tag className="h-3 w-3 text-muted-foreground" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium group-hover:text-purple-600 transition-colors truncate text-xs">
+                                  {subSubCategory.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  Sub-subcategory
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-xs text-muted-foreground">
+                              {subSubCategory.description || 'No description'}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">-</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                              <Tag className="h-2 w-2 mr-1" />
+                              Sub-sub
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {subSubCategory.isActive ? (
+                              <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
+                                <Eye className="h-2 w-2 mr-1" />
+                                Active
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20 text-xs">
+                                <EyeOff className="h-2 w-2 mr-1" />
+                                Inactive
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center text-xs">
+                            {subSubCategory.sortOrder ?? 0}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary" className="text-xs">
+                              {subSubCategory.productCount || 0}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-xs text-muted-foreground">-</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              {openEditSubSubCategory && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-100 hover:text-blue-600"
+                                  onClick={() => openEditSubSubCategory(subSubCategory)}
+                                  title="Edit Sub-Subcategory"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-100 hover:text-red-600"
+                                onClick={() => confirmDelete("subsubcategory", subSubCategory.id, subSubCategory.name)}
+                                title="Delete Sub-Subcategory"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  ))}
+                </>
               ))}
             </TableBody>
           </Table>

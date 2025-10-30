@@ -56,21 +56,40 @@ export interface RefreshTokenRequest {
   refreshToken: string;
 }
 
-// Product Types
+// Product Types - Updated to match backend API response
 export interface Product {
-  id: string;
-  name: string;
+  productId: string;
+  productName: string;
   description: string;
-  category: string;
+  productDescription?: string;
   price: number;
-  stock: number;
-  status: 'approved' | 'pending' | 'rejected';
+  discount: number;
+  stockQuantity: number;
+  sku: string;
+  categoryId: string;
+  categoryName: string;
+  subCategoryId?: string | null;
+  subCategoryName?: string | null;
+  subSubCategoryId?: string | null;
+  subSubCategoryName?: string | null;
+  status: 'approved' | 'pending' | 'rejected' | string;
+  isActive: boolean;
+  isFeatured: boolean;
+  imageUrls: string[];
+  merchantID: string;
+  createdOn: string;
+  updatedOn?: string | null;
+  // Legacy fields for backward compatibility
+  id?: string;
+  name?: string;
+  category?: string;
+  stock?: number;
   image?: string;
   images?: string[];
-  rating: number;
-  sales: number;
-  createdAt: string;
-  updatedAt: string;
+  rating?: number;
+  sales?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ProductCreateRequest {
@@ -245,12 +264,12 @@ export interface ApiResponse<T> {
 
 export interface PaginatedResponse<T> {
   data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 // Error Types

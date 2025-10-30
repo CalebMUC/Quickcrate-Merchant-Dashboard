@@ -64,6 +64,25 @@ export interface CreateProductResponse {
   errors?: string[];
 }
 
+// UpdateProductDto interface - Frontend format (camelCase)
+// Used for updating existing products
+export interface UpdateProductDto {
+  name: string;
+  description: string;
+  price: number;
+  categoryName: string;
+  subcategoryName?: string;
+  brand: string;
+  sku: string;
+  stockQuantity: number;
+  weight?: number;
+  dimensions?: string;
+  tags?: string[];
+  isActive: boolean;
+  isFeatured: boolean;
+  imageUrls?: string[]; // Added for image updates
+}
+
 export interface ProductImageUpload {
   file: File;
   id: string;
@@ -226,22 +245,22 @@ export const productsService = {
         
         // Create clean product payload with EXACT backend field names (PascalCase)
         productPayload = {
-          // Required fields matching BaseProductDto
-          ProductName: dto.productName.trim(),
-          Description: dto.description.trim(),
-          ProductDescription: dto.productDescription.trim(),
-          Price: dto.price,
-          Discount: dto.discount,
-          StockQuantity: dto.stockQuantity,
-          SKU: dto.sku?.trim() || '', // Backend expects empty string, not omitted
-          CategoryId: dto.categoryId,
-          CategoryName: dto.categoryName.trim(),
-          ProductSpecification: dto.productSpecification.trim(),
-          Features: dto.features.trim(),
-          BoxContents: dto.boxContents.trim(),
+          // Required fields matching BaseProductDto - with safe string handling
+          ProductName: (dto.productName || '').trim(),
+          Description: (dto.description || '').trim(),
+          ProductDescription: (dto.productDescription || '').trim(),
+          Price: dto.price || 0,
+          Discount: dto.discount || 0,
+          StockQuantity: dto.stockQuantity || 0,
+          SKU: (dto.sku || '').trim(),
+          CategoryId: dto.categoryId || '',
+          CategoryName: (dto.categoryName || '').trim(),
+          ProductSpecification: (dto.productSpecification || '').trim(),
+          Features: (dto.features || '').trim(),
+          BoxContents: (dto.boxContents || '').trim(),
           ProductType: dto.productType || 'physical',
-          IsActive: dto.isActive,
-          IsFeatured: dto.isFeatured,
+          IsActive: dto.isActive ?? true,
+          IsFeatured: dto.isFeatured ?? false,
           Status: dto.status || 'pending',
           ImageUrls: imageUrls, // 🎯 Use uploaded image URLs
         };
@@ -256,7 +275,7 @@ export const productsService = {
         }
 
         // Optional subcategory fields (Guid? means nullable)
-        if (dto.subCategoryId && dto.subCategoryId !== 'null' && dto.subCategoryId.trim()) {
+        if (dto.subCategoryId && dto.subCategoryId !== 'null' && (dto.subCategoryId || '').trim()) {
           productPayload.SubCategoryId = dto.subCategoryId;
           productPayload.SubCategoryName = dto.subCategoryName || '';
         } else {
@@ -265,7 +284,7 @@ export const productsService = {
           productPayload.SubCategoryName = null;
         }
         
-        if (dto.subSubCategoryId && dto.subSubCategoryId !== 'null' && dto.subSubCategoryId.trim()) {
+        if (dto.subSubCategoryId && dto.subSubCategoryId !== 'null' && (dto.subSubCategoryId || '').trim()) {
           productPayload.SubSubCategoryId = dto.subSubCategoryId;
           productPayload.SubSubCategoryName = dto.subSubCategoryName || '';
         } else {
@@ -409,9 +428,189 @@ export const productsService = {
     return apiClient.get<Product>(`/Products/${id}`);
   },
 
-  // Update product
-  async updateProduct(id: string, productData: Partial<Product>): Promise<Product> {
-    return apiClient.put<Product>(`/Products/${id}`, productData);
+  // Update product - Enhanced to match createProduct approach
+  async updateProduct(
+    id: string,
+    productData: ProductFormData | CreateProductDto,
+    images?: ProductImageUpload[]
+  ): Promise<Product> {
+    
+    try {
+      console.log('✏️ ProductService: Updating product with ID:', id);
+      console.log('📝 ProductService: Update data:', productData);
+      console.log('🖼️ ProductService: New images count:', images?.length || 0);
+
+      // Step 1: Upload new images if provided
+      let newImageUrls: string[] = [];
+      if (images && images.length > 0) {
+        console.log('📸 Uploading new images for product update...');
+        newImageUrls = await this.uploadImages(images);
+      }
+
+      // Detect if we're using the new CreateProductDto format
+      const isNewFormat = 'merchantID' in productData && 'features' in productData;
+      console.log(`📦 Using ${isNewFormat ? 'new CreateProductDto' : 'legacy ProductFormData'} format for update`);
+
+      // Step 2: Prepare product update payload
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7270/api';
+      const endpoint = `${apiUrl}/Products/${id}`;
+      
+      let productPayload: any;
+
+      if (isNewFormat) {
+        const dto = productData as CreateProductDto;
+        
+        // Get current user's merchant ID from JWT token
+        const currentUser = getCurrentUserFromToken();
+        const merchantId = currentUser?.merchantId;
+        
+        // Create comprehensive product update payload with EXACT backend field names (PascalCase)
+        productPayload = {
+          // REQUIRED: ProductId must match URL parameter for backend validation
+          ProductId: id,
+          
+          // Required fields matching UpdateProductDto - with safe string handling
+          ProductName: (dto.productName || '').trim(),
+          Description: (dto.description || '').trim(),
+          ProductDescription: (dto.productDescription || '').trim(),
+          Price: dto.price || 0,
+          Discount: dto.discount || 0,
+          StockQuantity: dto.stockQuantity || 0,
+          SKU: (dto.sku || '').trim(),
+          CategoryId: dto.categoryId, // Required GUID - must be provided
+          CategoryName: (dto.categoryName || '').trim(),
+          ProductSpecification: (dto.productSpecification || '').trim(),
+          Features: (dto.features || '').trim(),
+          BoxContents: (dto.boxContents || '').trim(),
+          ProductType: dto.productType || 'physical',
+          IsActive: dto.isActive ?? true,
+          IsFeatured: dto.isFeatured ?? false,
+          Status: dto.status || 'pending',
+        };
+
+        // Handle image URLs - combine existing and new
+        const existingImageUrls = dto.imageUrls || [];
+        const allImageUrls = [...existingImageUrls, ...newImageUrls];
+        productPayload.ImageUrls = allImageUrls;
+
+        // Add MerchantID from JWT token or let backend handle it
+        if (merchantId) {
+          productPayload.MerchantID = merchantId;
+          console.log('✅ Using MerchantID from JWT token:', merchantId);
+        } else {
+          console.log('⚠️ No MerchantID in token - backend will use _currentUserService.MerchantId');
+        }
+
+        // Optional subcategory fields (Guid? means nullable)
+        if (dto.subCategoryId && dto.subCategoryId !== 'null' && (dto.subCategoryId || '').trim()) {
+          productPayload.SubCategoryId = dto.subCategoryId;
+          productPayload.SubCategoryName = dto.subCategoryName || '';
+        } else {
+          productPayload.SubCategoryId = null;
+          productPayload.SubCategoryName = null;
+        }
+        
+        if (dto.subSubCategoryId && dto.subSubCategoryId !== 'null' && (dto.subSubCategoryId || '').trim()) {
+          productPayload.SubSubCategoryId = dto.subSubCategoryId;
+          productPayload.SubSubCategoryName = dto.subSubCategoryName || '';
+        } else {
+          productPayload.SubSubCategoryId = null;
+          productPayload.SubSubCategoryName = null;
+        }
+      } else {
+        // Handle legacy ProductFormData format
+        const legacy = productData as ProductFormData;
+        
+        productPayload = {
+          // REQUIRED: ProductId must match URL parameter for backend validation
+          ProductId: id,
+          
+          ProductName: (legacy.productName || '').trim(),
+          Description: (legacy.description || '').trim(),
+          ProductDescription: (legacy.productDescription || '').trim(),
+          Price: legacy.price || 0,
+          Discount: legacy.discount || 0,
+          StockQuantity: legacy.stockQuantity || 0,
+          SKU: '', // ProductFormData doesn't have SKU field
+          CategoryId: legacy.categoryId ? legacy.categoryId.toString() : null, // Will be validated below
+          CategoryName: (legacy.categoryName || '').trim(),
+          SubCategoryId: legacy.subCategoryId?.toString() || null,
+          SubCategoryName: legacy.subCategoryName || null,
+          SubSubCategoryId: legacy.subSubCategoryId?.toString() || null,
+          SubSubCategoryName: legacy.subSubCategoryName || null,
+          ProductSpecification: (legacy.specification || '').trim(),
+          Features: (legacy.keyFeatures || '').trim(),
+          BoxContents: (legacy.box || '').trim(),
+          ProductType: legacy.productType || 'physical',
+          IsActive: legacy.inStock ?? true,
+          IsFeatured: false, // Not in legacy format
+          Status: 'pending', // Default for legacy
+          ImageUrls: newImageUrls, // Use new uploaded images
+        };
+      }
+
+      console.log('🚀 ProductService: Sending update request to', endpoint);
+      console.log('📦 Product update payload:', productPayload);
+      console.log('🔍 CategoryId value:', productPayload.CategoryId, 'Type:', typeof productPayload.CategoryId);
+
+      // Validate required fields before sending
+      if (!productPayload.CategoryId) {
+        throw new Error('CategoryId is required and must be a valid GUID');
+      }
+      
+      // Log what we're sending for debugging
+      console.log('✅ Validation passed - CategoryId:', productPayload.CategoryId);
+
+      // Send update request to backend - [FromBody] expects direct UpdateProductDto
+      const response = await fetch(endpoint, {
+        method: 'POST', // Using POST for updates
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(productPayload),
+      });
+
+      if (!response.ok) {
+        let errorData;
+        const responseText = await response.text();
+        
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { message: responseText };
+        }
+        
+        console.error('🚨 Update Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorData
+        });
+        
+        // More detailed error message
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        if (errorData.message) {
+          errorMessage += ` - ${errorData.message}`;
+        }
+        if (errorData.errors) {
+          errorMessage += ` | Validation Errors: ${JSON.stringify(errorData.errors)}`;
+        }
+        if (errorData.title) {
+          errorMessage += ` | ${errorData.title}`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log('✅ ProductService: Product updated successfully:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('💥 ProductService: Error updating product:', error);
+      throw error;
+    }
   },
 
   // Delete product (permanent deletion)
@@ -459,6 +658,11 @@ export const productsService = {
   // Get categories
   async getCategories(): Promise<{ id: string; name: string; productCount: number }[]> {
     return apiClient.get<{ id: string; name: string; productCount: number }[]>('/Products/categories');
+  },
+
+  // Get subcategories by category name
+  async getSubcategories(categoryName: string): Promise<{ id: string; name: string; productCount: number }[]> {
+    return apiClient.get<{ id: string; name: string; productCount: number }[]>(`/Products/categories/${encodeURIComponent(categoryName)}/subcategories`);
   },
 
   // Update inventory

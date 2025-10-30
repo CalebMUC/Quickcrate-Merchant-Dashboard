@@ -13,6 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
@@ -26,11 +36,13 @@ import {
   Loader2, 
   CheckCircle, 
   XCircle, 
-  Users
+  Users,
+  AlertCircle
 } from "lucide-react"
 import { productsService } from "@/lib/api/products"
 import { Product, PaginatedResponse, User } from "@/types"
 import { toast } from "sonner"
+import { AddProductModal } from "@/components/add-product-modal"
 
 const statusColors = {
   approved: "bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20",
@@ -55,6 +67,10 @@ export function ProductsTable() {
     hasPreviousPage: false
   })
   const [refreshing, setRefreshing] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<string | null>(null)
   
   // Get current user info for role checking
   const currentUser = productsService.getCurrentUser()
@@ -129,19 +145,33 @@ export function ProductsTable() {
   }
 
   // Handle product actions
-  const handleDeleteProduct = async (productId: string) => {
+  const handleEditProduct = (product: Product) => {
+    setSelectedProduct(product)
+    setEditModalOpen(true)
+  }
+
+  const handleDeleteClick = (productId: string) => {
     if (!productId) {
       toast.error('Invalid product ID')
       return
     }
+    setProductToDelete(productId)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return
 
     try {
-      await productsService.deleteProduct(productId)
+      await productsService.deleteProduct(productToDelete)
       toast.success('Product deleted successfully')
       await fetchProducts(pagination.page, searchTerm, statusFilter)
     } catch (error) {
       console.error('Error deleting product:', error)
       toast.error('Failed to delete product')
+    } finally {
+      setDeleteDialogOpen(false)
+      setProductToDelete(null)
     }
   }
 
@@ -262,7 +292,7 @@ export function ProductsTable() {
               <TableHead>Price</TableHead>
               <TableHead>Stock</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[70px]"></TableHead>
+              <TableHead className="w-[120px] text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -421,53 +451,70 @@ export function ProductsTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => console.log('View product:', product.productId || product.id)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => console.log('Edit product:', product.productId || product.id)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {isAdmin && product.status === 'pending' && (
-                          <>
-                            <DropdownMenuItem 
-                              onClick={() => handleApproveProduct(product.productId ?? product.id ?? '')}
-                              className="text-green-600"
+                    <div className="flex items-center justify-center gap-1">
+                      {/* Edit and Delete buttons are always visible to all users */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditProduct(product)}
+                        className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600"
+                        title="Edit Product"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteClick(product.productId ?? product.id ?? '')}
+                        className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                        title="Delete Product"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+
+                      {/* Admin-only actions in dropdown */}
+                      {isAdmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-gray-100"
+                              title="Admin Actions"
                             >
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Approve
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Admin Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => console.log('View product:', product.productId || product.id)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleRejectProduct(product.productId ?? product.id ?? '')}
-                              className="text-red-600"
-                            >
-                              <XCircle className="mr-2 h-4 w-4" />
-                              Reject
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        <DropdownMenuItem 
-                          onClick={() => handleDeleteProduct(product.productId ?? product.id ?? '')}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            {product.status === 'pending' && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleApproveProduct(product.productId ?? product.id ?? '')}
+                                  className="text-green-600"
+                                >
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Approve
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleRejectProduct(product.productId ?? product.id ?? '')}
+                                  className="text-red-600"
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Reject
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -504,6 +551,57 @@ export function ProductsTable() {
           </div>
         </div>
       )}
+
+      {/* Edit Product Modal - Reusing AddProductModal */}
+      {selectedProduct && (
+        <AddProductModal
+          editMode={true}
+          editProduct={selectedProduct}
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false)
+            setSelectedProduct(null)
+          }}
+          onProductAdded={() => {
+            fetchProducts(pagination.page, searchTerm, statusFilter)
+            setEditModalOpen(false)
+            setSelectedProduct(null)
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              Delete Product
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-muted-foreground">
+              Are you sure you want to delete this product? This action cannot be undone and will permanently remove the product from your inventory.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setProductToDelete(null)
+              }}
+              className="hover:bg-gray-100"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Product
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

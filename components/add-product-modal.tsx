@@ -23,7 +23,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { productsService, type ProductFormData, type CreateProductDto, type ProductImageUpload } from "@/lib/api/products"
+import { productsService, type ProductFormData, type CreateProductDto, type UpdateProductDto, type ProductImageUpload } from "@/lib/api/products"
+import { Product } from "@/types"
 import {
   Form,
   FormControl,
@@ -241,13 +242,13 @@ function formatProductFeatures(featuresText: string): string {
       if (parsed._format === "structured" && Array.isArray(parsed.ProductFeatures)) {
         // Convert structured JSON to backend text format
         return parsed.ProductFeatures
-          .map(feature => feature.startsWith('•') ? feature : `• ${feature}`)
+          .map((feature: string) => feature.startsWith('•') ? feature : `• ${feature}`)
           .join('\n');
       }
       // Handle direct ProductFeatures array
       else if (Array.isArray(parsed.ProductFeatures)) {
         return parsed.ProductFeatures
-          .map(feature => feature.startsWith('•') ? feature : `• ${feature}`)
+          .map((feature: string) => feature.startsWith('•') ? feature : `• ${feature}`)
           .join('\n');
       }
     }
@@ -262,18 +263,38 @@ function formatProductFeatures(featuresText: string): string {
 interface AddProductModalProps {
   trigger?: React.ReactNode
   onProductAdded?: (product: any) => void
+  // Edit mode props
+  editMode?: boolean
+  editProduct?: Product | null
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 interface ImageUpload {
-  file: File
+  file: File | null // Allow null for existing images
   preview: string
   id: string
+  isExisting?: boolean // Flag for existing images
 }
 
-export function AddProductModal({ trigger, onProductAdded }: AddProductModalProps) {
-  const [open, setOpen] = useState(false)
+export function AddProductModal({ 
+  trigger, 
+  onProductAdded, 
+  editMode = false, 
+  editProduct = null, 
+  isOpen = false, 
+  onClose 
+}: AddProductModalProps) {
+  const [open, setOpen] = useState(editMode ? isOpen : false)
   const [images, setImages] = useState<ImageUpload[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Sync open state with isOpen prop in edit mode
+  useEffect(() => {
+    if (editMode) {
+      setOpen(isOpen)
+    }
+  }, [editMode, isOpen])
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("basic")
   const [categories, setCategories] = useState<Category[]>([])
@@ -316,6 +337,121 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
     }
   })
 
+  // Populate form when in edit mode
+  useEffect(() => {
+    if (editMode && editProduct && open) {
+      console.log('🔄 Populating edit form with product data:', editProduct)
+      
+      // Set form values with proper fallbacks based on Product interface
+      form.reset({
+        // Basic Information
+        productName: editProduct.productName || editProduct.name || "",
+        description: editProduct.description || "",
+        productDescription: editProduct.productDescription || editProduct.description || "",
+        price: editProduct.price || 0,
+        discount: editProduct.discount || 0,
+        stockQuantity: editProduct.stockQuantity || editProduct.stock || 0,
+        sku: editProduct.sku || "",
+        
+        // Category Information (Product interface now includes all category IDs and names)
+        categoryId: editProduct.categoryId || "",
+        categoryName: editProduct.categoryName || editProduct.category || "",
+        subCategoryId: editProduct.subCategoryId || "",
+        subCategoryName: editProduct.subCategoryName || "",
+        subSubCategoryId: editProduct.subSubCategoryId || "",
+        subSubCategoryName: editProduct.subSubCategoryName || "",
+        
+        // Product Details (not in Product interface, use fallbacks)
+        productSpecification: (editProduct as any).productSpecification || editProduct.description || "",
+        features: (editProduct as any).features || "",
+        boxContents: (editProduct as any).boxContents || "",
+        productType: (editProduct as any).productType || "physical",
+        
+        // Status and Features
+        isActive: editProduct.isActive ?? true,
+        isFeatured: editProduct.isFeatured ?? false,
+        status: editProduct.status || "pending",
+        
+        // Search and Images
+        searchKeywords: (editProduct as any).searchKeywords || editProduct.productName || editProduct.name || "",
+        imageUrls: editProduct.imageUrls || [],
+        merchantID: editProduct.merchantID || "00000000-0000-0000-0000-000000000000"
+      })
+
+      console.log('✅ Form populated with values:', {
+        productName: editProduct.productName || editProduct.name,
+        categoryId: editProduct.categoryId,
+        categoryName: editProduct.categoryName,
+        subCategoryId: editProduct.subCategoryId,
+        subCategoryName: editProduct.subCategoryName,
+        subSubCategoryId: editProduct.subSubCategoryId,
+        subSubCategoryName: editProduct.subSubCategoryName,
+        imageCount: editProduct.imageUrls?.length || 0
+      })
+
+      // Set images from imageUrls
+      if (editProduct.imageUrls && editProduct.imageUrls.length > 0) {
+        const imageUploads: ImageUpload[] = editProduct.imageUrls.map((url, index) => ({
+          id: `edit-image-${index}`,
+          preview: url,
+          file: null, // Existing images don't have file objects
+          isExisting: true // Mark as existing
+        }))
+        setImages(imageUploads)
+      } else {
+        setImages([]) // Clear images if no imageUrls
+      }
+
+      // Load categories and subcategories for edit mode
+      loadCategories().then(() => {
+        // Load subcategories if category exists (to enable dropdown and show options)
+        if (editProduct.categoryId) {
+          console.log('🔄 Loading subcategories for edit mode - Category ID:', editProduct.categoryId)
+          
+          loadSubCategories(editProduct.categoryId).then(() => {
+            // After subcategories are loaded, try to find and set the correct subCategoryId
+            // if we have a subCategoryName but no subCategoryId
+            if (editProduct.subCategoryName && !editProduct.subCategoryId) {
+              const matchingSubCategory = subCategories.find(sc => 
+                sc.name.toLowerCase() === editProduct.subCategoryName?.toLowerCase()
+              )
+              
+              if (matchingSubCategory) {
+                console.log('🔍 Found matching subcategory:', matchingSubCategory)
+                form.setValue("subCategoryId", matchingSubCategory.subCategoryId || matchingSubCategory.id)
+              }
+            }
+            
+            // Load sub-subcategories if we have subCategory info
+            if (editProduct.subCategoryId || editProduct.subCategoryName) {
+              const subCategoryIdToUse = editProduct.subCategoryId || 
+                subCategories.find(sc => sc.name.toLowerCase() === editProduct.subCategoryName?.toLowerCase())?.subCategoryId ||
+                subCategories.find(sc => sc.name.toLowerCase() === editProduct.subCategoryName?.toLowerCase())?.id
+              
+              if (subCategoryIdToUse) {
+                console.log('🔄 Loading sub-subcategories for edit mode - SubCategory ID:', subCategoryIdToUse)
+                
+                loadSubSubCategories(subCategoryIdToUse).then(() => {
+                  // Try to find and set the correct subSubCategoryId
+                  if (editProduct.subSubCategoryName && !editProduct.subSubCategoryId) {
+                    const matchingSubSubCategory = subSubCategories.find(ssc => 
+                      ssc.name.toLowerCase() === editProduct.subSubCategoryName?.toLowerCase()
+                    )
+                    
+                    if (matchingSubSubCategory) {
+                      console.log('🔍 Found matching sub-subcategory:', matchingSubSubCategory)
+                      form.setValue("subSubCategoryId", matchingSubSubCategory.subSubCategoryId || matchingSubSubCategory.id)
+                    }
+                  }
+                })
+              }
+            }
+          })
+        }
+      })
+    }
+  }, [editMode, editProduct, open, form])
+
   const watchedCategoryId = form.watch("categoryId")
   const watchedSubCategoryId = form.watch("subCategoryId")
 
@@ -329,7 +465,15 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
   // Load subcategories when category changes
   useEffect(() => {
     if (watchedCategoryId) {
-      loadSubCategories(watchedCategoryId)
+      // Only load subcategories if not already loaded or if category actually changed
+      const shouldLoadSubCategories = !editMode || 
+        subCategories.length === 0 || 
+        !subCategories.some(sc => sc.categoryId === watchedCategoryId)
+      
+      if (shouldLoadSubCategories) {
+        console.log('🔄 Category changed or initial load, loading subcategories for:', watchedCategoryId)
+        loadSubCategories(watchedCategoryId)
+      }
     } else {
       setSubCategories([])
       setSubSubCategories([])
@@ -339,7 +483,15 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
   // Load sub-subcategories when subcategory changes
   useEffect(() => {
     if (watchedSubCategoryId) {
-      loadSubSubCategories(watchedSubCategoryId)
+      // Only load sub-subcategories if not already loaded or if subcategory actually changed
+      const shouldLoadSubSubCategories = !editMode || 
+        subSubCategories.length === 0 || 
+        !subSubCategories.some(ssc => ssc.subCategoryId === watchedSubCategoryId)
+      
+      if (shouldLoadSubSubCategories) {
+        console.log('🔄 Subcategory changed or initial load, loading sub-subcategories for:', watchedSubCategoryId)
+        loadSubSubCategories(watchedSubCategoryId)
+      }
     } else {
       setSubSubCategories([])
     }
@@ -388,14 +540,23 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
       
       const response = await categoriesService.getSubCategories(categoryId)
       
-      console.log('✅ Subcategories loaded:', response.length)
-      setSubCategories(response.map((cat: SubCategory) => ({
+      console.log('✅ Subcategories loaded:', response.length, 'subcategories')
+      const processedSubCategories = response.map((cat: SubCategory) => ({
         ...cat,
         categoryId: categoryId
-      })))
+      }))
       
-      // Reset sub-subcategories when subcategories change
-      setSubSubCategories([])
+      setSubCategories(processedSubCategories)
+      
+      // Only reset sub-subcategories if not in edit mode or if category actually changed
+      if (!editMode || !editProduct) {
+        setSubSubCategories([])
+      }
+      
+      console.log('📋 Processed subcategories:', processedSubCategories.map(sc => ({
+        id: sc.subCategoryId || sc.id,
+        name: sc.name
+      })))
       
     } catch (error) {
       console.error('💥 Error loading subcategories for category', categoryId, ':', error)
@@ -420,10 +581,17 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
       
       const response = await categoriesService.getSubSubCategories(subCategoryId)
       
-      console.log('✅ Sub-subcategories loaded:', response.length)
-      setSubSubCategories(response.map((cat: SubSubCategory) => ({
+      console.log('✅ Sub-subcategories loaded:', response.length, 'sub-subcategories')
+      const processedSubSubCategories = response.map((cat: SubSubCategory) => ({
         ...cat,
         subCategoryId: subCategoryId
+      }))
+      
+      setSubSubCategories(processedSubSubCategories)
+      
+      console.log('📋 Processed sub-subcategories:', processedSubSubCategories.map(ssc => ({
+        id: ssc.subSubCategoryId || ssc.id,
+        name: ssc.name
       })))
       
     } catch (error) {
@@ -497,11 +665,13 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
         validationErrors.push("Stock quantity cannot be negative")
       }
 
-      // Validate image files
+      // Validate image files (skip validation for existing images)
       for (const image of images) {
-        const validation = productsService.validateImage(image.file)
-        if (!validation.valid) {
-          validationErrors.push(validation.error || "Invalid image file")
+        if (!image.isExisting && image.file) {
+          const validation = productsService.validateImage(image.file)
+          if (!validation.valid) {
+            validationErrors.push(validation.error || "Invalid image file")
+          }
         }
       }
 
@@ -593,18 +763,25 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
         }
       }
 
-      // Prepare product images with enhanced metadata
-      const productImages: ProductImageUpload[] = images.map((image, index) => ({
-        id: image.id,
-        file: image.file,
-        preview: image.preview,
-        alt: `${data.productName} - Image ${index + 1}`,
-        isPrimary: index === 0,
-        order: index,
-        caption: `${data.productName} view ${index + 1}`,
-        size: image.file.size,
-        type: image.file.type,
-      }))
+      // Prepare product images with enhanced metadata (only for new images)
+      const productImages: ProductImageUpload[] = images
+        .filter(image => !image.isExisting && image.file) // Only new images with files
+        .map((image, index) => ({
+          id: image.id,
+          file: image.file!,
+          preview: image.preview,
+          alt: `${data.productName} - Image ${index + 1}`,
+          isPrimary: index === 0,
+          order: index,
+          caption: `${data.productName} view ${index + 1}`,
+          size: image.file!.size,
+          type: image.file!.type,
+        }))
+
+      // For edit mode, collect existing image URLs
+      const existingImageUrls = editMode ? images
+        .filter(image => image.isExisting)
+        .map(image => image.preview) : []
 
       // Create ProductDto payload that matches backend CreateProductDto
       const createProductDto = {
@@ -636,11 +813,11 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
         isFeatured: data.isFeatured,
         status: data.status,
         
-        // Images (will be populated from uploaded images)
-        imageUrls: images.map(img => img.preview), // Temporary URLs, backend will replace with actual URLs
+        // Images (existing + new)
+        imageUrls: editMode ? [...existingImageUrls, ...productImages.map(img => img.preview)] : images.map(img => img.preview),
         
         // Required Merchant ID (will be set from JWT token in productsService)
-        merchantID: data.merchantID || "", // Backend will get from _currentUserService.MerchantId
+        merchantID: data.merchantID || "" // Backend will get from _currentUserService.MerchantId
       }
 
       // Legacy ProductFormData for backward compatibility (if needed)
@@ -671,21 +848,42 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
       console.log('🔄 Legacy Product Data:', legacyProductData)
       console.log('🖼️ Product Images:', productImages)
 
-      // Use new CreateProductDto format
-      const response = await productsService.createProduct(createProductDto, productImages)
-
-      console.log('✅ Product created successfully:', response)
+      let response
       
-      // Enhanced success feedback with category information
-      const categoryPath = [
-        createProductDto.categoryName,
-        createProductDto.subCategoryName,
-        createProductDto.subSubCategoryName
-      ].filter(Boolean).join(' > ')
-      
-      toast.success("🎉 Product Created Successfully!", {
-        description: `${data.productName} has been added to ${categoryPath || 'Products'}`,
-      })
+      if (editMode && editProduct) {
+        // Update existing product - use same structure as createProductDto
+        // The updateProduct method expects CreateProductDto format with GUIDs
+        
+        const productId = editProduct.productId || editProduct.id
+        if (!productId) {
+          throw new Error('Product ID is missing for update operation')
+        }
+        
+        // Pass the createProductDto directly since updateProduct expects CreateProductDto format
+        console.log('🔍 Update: CategoryId being sent:', createProductDto.categoryId)
+        console.log('📦 Update: Full DTO being sent:', createProductDto)
+        response = await productsService.updateProduct(productId, createProductDto)
+        console.log('✅ Product updated successfully:', response)
+        
+        toast.success("🎉 Product Updated Successfully!", {
+          description: `${data.productName} has been updated`,
+        })
+      } else {
+        // Create new product
+        response = await productsService.createProduct(createProductDto, productImages)
+        console.log('✅ Product created successfully:', response)
+        
+        // Enhanced success feedback with category information
+        const categoryPath = [
+          createProductDto.categoryName,
+          createProductDto.subCategoryName,
+          createProductDto.subSubCategoryName
+        ].filter(Boolean).join(' > ')
+        
+        toast.success("🎉 Product Created Successfully!", {
+          description: `${data.productName} has been added to ${categoryPath || 'Products'}`,
+        })
+      }
 
       // Reset form and close modal
       form.reset()
@@ -694,7 +892,12 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
       setSubCategories([])
       setSubSubCategories([])
       setActiveTab("basic")
-      setOpen(false)
+      
+      if (editMode && onClose) {
+        onClose()
+      } else {
+        setOpen(false)
+      }
       
       // Cleanup object URLs
       images.forEach(img => URL.revokeObjectURL(img.preview))
@@ -822,10 +1025,13 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
           <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
             <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-gray-900">
               <Package className="h-6 w-6 text-blue-600" />
-              Add New Product
+              {editMode ? "Edit Product" : "Add New Product"}
             </DialogTitle>
             <DialogDescription className="text-gray-600 mt-2">
-              Create a comprehensive product listing with detailed information. All required fields must be completed for approval.
+              {editMode 
+                ? "Update the product information. Changes will be saved when you submit the form."
+                : "Create a comprehensive product listing with detailed information. All required fields must be completed for approval."
+              }
             </DialogDescription>
           </DialogHeader>
 
@@ -1942,10 +2148,10 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                                   </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1 truncate">
-                                  {image.file.name}
+                                  {image.file ? image.file.name : `Image ${index + 1}`}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {(image.file.size / 1024 / 1024).toFixed(1)} MB
+                                  {image.file ? `${(image.file.size / 1024 / 1024).toFixed(1)} MB` : (image.isExisting ? 'Existing' : 'Unknown')}
                                 </p>
                               </div>
                             ))}
@@ -1993,12 +2199,12 @@ export function AddProductModal({ trigger, onProductAdded }: AddProductModalProp
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Adding Product...
+                        {editMode ? "Updating Product..." : "Adding Product..."}
                       </>
                     ) : (
                       <>
                         <Plus className="mr-2 h-4 w-4" />
-                        Add Product
+                        {editMode ? "Update Product" : "Add Product"}
                       </>
                     )}
                   </Button>
