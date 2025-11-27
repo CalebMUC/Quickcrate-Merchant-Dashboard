@@ -104,6 +104,7 @@ export function ProductsTable() {
       console.log('✅ Products fetched:', response)
       
       setProducts(response.data)
+      
       setPagination({
         page: response.page,
         pageSize: response.pageSize,

@@ -228,7 +228,7 @@ export const productsService = {
 
       // Step 2: Create product with uploaded image URLs
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7270/api';
-      const endpoint = `${apiUrl}/Products/create`;
+      const endpoint = `${apiUrl}/Product/Create`;
       
       let productPayload: any;
 
@@ -420,7 +420,7 @@ export const productsService = {
     };
 
     // Use POST /Products/search endpoint as defined in controller
-    return apiClient.post<PaginatedResponse<Product>>('/Products/search', filter);
+    return apiClient.post<PaginatedResponse<Product>>('/Product/search', filter);
   },
 
   // Get single product

@@ -19,22 +19,10 @@ import {
   Tags,
   Boxes,
   Clock,
-  CheckCircle,
-  XCircle,
-  Truck,
-  MapPin,
   Receipt,
-  Wallet,
   TrendingUp,
-  Calendar,
-  Download,
   User,
-  Shield,
-  Palette,
   MessageSquare,
-  Phone,
-  FileQuestion,
-  AlertCircle,
   Folder
 } from "lucide-react"
 
@@ -67,16 +55,6 @@ const navigation = [
         icon: Package,
       },
       {
-        name: "Categories",
-        href: "/products/categories",
-        icon: Tags,
-      },
-      {
-        name: "Subcategories",
-        href: "/products/subcategories",
-        icon: Folder,
-      },
-      {
         name: "Approval Queue", 
         href: "/products?tab=pending",
         icon: Clock,
@@ -85,6 +63,23 @@ const navigation = [
         name: "Inventory",
         href: "/products/inventory",
         icon: Boxes,
+      }
+    ]
+  },
+  {
+    name: "Categories",
+    href: "/categories",
+    icon: Tags,
+    submenu: [
+      {
+        name: "All Categories",
+        href: "/categories",
+        icon: Tags,
+      },
+      {
+        name: "Sub-Categories",
+        href: "/categories/subcategories",
+        icon: Folder,
       }
     ]
   },
@@ -102,26 +97,6 @@ const navigation = [
         name: "Pending Orders",
         href: "/orders/pending",
         icon: Clock,
-      },
-      {
-        name: "Completed Orders",
-        href: "/orders/completed",
-        icon: CheckCircle,
-      },
-      {
-        name: "Cancelled Orders",
-        href: "/orders/cancelled",
-        icon: XCircle,
-      },
-      {
-        name: "Shipping",
-        href: "/orders/shipping",
-        icon: Truck,
-      },
-      {
-        name: "Tracking",
-        href: "/orders/tracking",
-        icon: MapPin,
       }
     ]
   },
@@ -131,7 +106,7 @@ const navigation = [
     icon: CreditCard,
     submenu: [
       {
-        name: "Transactions",
+        name: "Overview",
         href: "/payments",
         icon: Receipt,
       },
@@ -139,16 +114,6 @@ const navigation = [
         name: "Payment Methods",
         href: "/payments/methods",
         icon: CreditCard,
-      },
-      {
-        name: "Payouts",
-        href: "/payments/payouts",
-        icon: Wallet,
-      },
-      {
-        name: "Refunds",
-        href: "/payments/refunds",
-        icon: XCircle,
       }
     ]
   },
@@ -156,38 +121,6 @@ const navigation = [
     name: "Reports",
     href: "/reports",
     icon: FileText,
-    submenu: [
-      {
-        name: "Sales Reports",
-        href: "/reports",
-        icon: TrendingUp,
-      },
-      {
-        name: "Financial Reports",
-        href: "/reports/financial",
-        icon: Receipt,
-      },
-      {
-        name: "Product Reports",
-        href: "/reports/products",
-        icon: Package,
-      },
-      {
-        name: "Custom Reports",
-        href: "/reports/custom",
-        icon: FileText,
-      },
-      {
-        name: "Schedule Reports",
-        href: "/reports/schedule",
-        icon: Calendar,
-      },
-      {
-        name: "Export Data",
-        href: "/reports/export",
-        icon: Download,
-      }
-    ]
   },
   {
     name: "Settings",
@@ -203,21 +136,6 @@ const navigation = [
         name: "Profile",
         href: "/settings/profile",
         icon: User,
-      },
-      {
-        name: "Security",
-        href: "/settings/security",
-        icon: Shield,
-      },
-      {
-        name: "Appearance",
-        href: "/settings/appearance",
-        icon: Palette,
-      },
-      {
-        name: "Notifications",
-        href: "/settings/notifications",
-        icon: Bell,
       }
     ]
   },
@@ -243,21 +161,6 @@ const secondaryNavigation = [
         name: "Contact Support",
         href: "/support/contact",
         icon: MessageSquare,
-      },
-      {
-        name: "Phone Support",
-        href: "/support/phone",
-        icon: Phone,
-      },
-      {
-        name: "Documentation",
-        href: "/support/docs",
-        icon: FileQuestion,
-      },
-      {
-        name: "System Status",
-        href: "/support/status",
-        icon: AlertCircle,
       }
     ]
   },

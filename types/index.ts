@@ -126,6 +126,38 @@ export interface OrderItem {
   price: number;
 }
 
+export interface MerchantOrderProduct{
+  productID: string;
+  productName: string;
+  quantity: number;
+  price: number;
+}
+
+export interface MerchantOrder{
+  orderId: string;
+  subTotal: number;
+  status: string;
+  orderDate: string;
+  products: MerchantOrderProduct[];
+}
+
+export interface MerchantOrderResponse {
+  success: boolean;
+  message: string;
+  data: MerchantOrder[];
+  count: number;
+} 
+
+export interface OrderStatuses{
+  statusID : number,
+  status : string,
+  description : string,
+  createdOn : string,
+  createdBy : string, 
+  updatedOn?: string,
+  updatedBy?: string
+}
+
 export interface Address {
   street: string;
   city: string;
@@ -155,6 +187,119 @@ export interface PaymentMethod {
   last4?: string;
   isPrimary: boolean;
   isActive: boolean;
+}
+
+// Payout Types
+export interface Payout {
+  payoutId: string;
+  merchantId: string;
+  grossAmount: number;
+  commissionAmount: number;
+  commissionRate: number;
+  netAmount: number;
+  status: 'Pending' | 'Scheduled' | 'Processing' | 'Completed' | 'Failed' | 'Cancelled';
+  periodStartDate: string;
+  periodEndDate: string;
+  scheduledDate: string;
+  completedDate?: string;
+  paymentReference?: string;
+  failureReason?: string;
+  orderCount: number;
+  productCount: number;
+  notes?: string;
+  paymentMethod?: PaymentMethodSummary;
+  transactions?: PayoutTransaction[];
+  createdOn: string;
+}
+
+export interface PayoutTransaction {
+  payoutTransactionId: string;
+  orderId: string;
+  orderNumber: string;
+  orderAmount: number;
+  commissionAmount: number;
+  netAmount: number;
+  orderCompletedDate: string;
+  customerName: string;
+  itemCount: number;
+}
+
+export interface PaymentMethodSummary {
+  paymentMethodId: string;
+  type: string;
+  name: string;
+  maskedDetails: string;
+}
+
+export interface MerchantPaymentMethod {
+  paymentMethodId: string;
+  type: 'BankTransfer' | 'MobileMoney' | 'PayPal' | 'DebitCard' | 'Cryptocurrency';
+  name: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  isVerified: boolean;
+  bankName?: string;
+  maskedAccountNumber?: string;
+  accountHolderName?: string;
+  maskedMobileNumber?: string;
+  mobileMoneyProvider?: string;
+  payPalEmail?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+  createdOn: string;
+  lastUsedOn?: string;
+}
+
+export interface CreatePaymentMethodRequest {
+  type: 'BankTransfer' | 'MobileMoney' | 'PayPal' | 'DebitCard' | 'Cryptocurrency';
+  name: string;
+  isPrimary?: boolean;
+  // Bank Transfer fields
+  bankName?: string;
+  accountNumber?: string;
+  accountHolderName?: string;
+  routingNumber?: string;
+  swiftCode?: string;
+  // Mobile Money fields
+  mobileNumber?: string;
+  mobileMoneyProvider?: string;
+  // PayPal fields
+  payPalEmail?: string;
+  // Card fields
+  cardNumber?: string;
+  cardHolderName?: string;
+  expiryDate?: string;
+}
+
+export interface PayoutStats {
+  totalEarnings: number;
+  pendingPayout: number;
+  thisMonthEarnings: number;
+  lastMonthEarnings: number;
+  growthPercentage: number;
+  completedPayouts: number;
+  pendingPayouts: number;
+  failedPayouts: number;
+  nextPayoutDate?: string;
+  nextPayoutAmount: number;
+  lastPayoutDate?: string;
+  lastPayoutAmount: number;
+}
+
+export interface MerchantTransaction {
+  transactionId: string;
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  orderAmount: number;
+  commissionAmount: number;
+  netAmount: number;
+  paymentMethod: string;
+  payoutStatus: string;
+  orderDate: string;
+  payoutDate?: string;
+  payoutReference?: string;
+  itemCount: number;
 }
 
 // Notification Types

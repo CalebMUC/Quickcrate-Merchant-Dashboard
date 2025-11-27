@@ -1,178 +1,282 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+"use client"
+
+import { useState, useEffect } from "react"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ShoppingCart, Package, Truck, CheckCircle, Search } from "lucide-react"
+import { Package, RefreshCw, Download, TrendingUp, TrendingDown } from "lucide-react"
 
-const orders = [
-  {
-    id: "ORD-001",
-    customer: "John Smith",
-    email: "john@example.com",
-    total: "$299.00",
-    status: "delivered",
-    date: "2024-01-15",
-    items: 3,
-  },
-  {
-    id: "ORD-002",
-    customer: "Sarah Johnson",
-    email: "sarah@example.com",
-    total: "$159.00",
-    status: "shipped",
-    date: "2024-01-14",
-    items: 2,
-  },
-  {
-    id: "ORD-003",
-    customer: "Mike Davis",
-    email: "mike@example.com",
-    total: "$89.00",
-    status: "pending",
-    date: "2024-01-13",
-    items: 1,
-  },
-  {
-    id: "ORD-004",
-    customer: "Emily Brown",
-    email: "emily@example.com",
-    total: "$199.00",
-    status: "processing",
-    date: "2024-01-12",
-    items: 4,
-  },
-]
+import { MerchantOrder, MerchantOrderProduct, OrderStatuses } from "@/types"
+import { useOrders } from "@/features/orders/hooks/useOrders"
+import { useOrderTracking } from "@/features/orders/hooks/useOrderTracking"
+import { OrderFiltersBar } from "@/features/orders/components/OrderFiltersBar"
+import { OrderStatusBadge } from "@/features/orders/components/OrderStatusBadge"
+import { OrdersEmptyState, ErrorState } from "@/features/orders/components/EmptyState"
+import { OrdersTableSkeleton } from "@/features/orders/components/LoadingStates"
 
-const statusColors = {
-  pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-  processing: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  shipped: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-  delivered: "bg-green-500/10 text-green-500 border-green-500/20",
-}
+import { OrderProductsModal } from "@/components/order-products-modal"
+import { ProductTrackingModal } from "@/components/product-Tracking-modal"
+import { OrderStatus } from "@/features/orders"
 
 export default function OrdersPage() {
+  const merchantId = "ea1989e3-f9c4-4ff5-86bf-a24148aa570e"
+  
+  // Use custom hooks for state management
+  const { 
+    orders, 
+    loading, 
+    error, 
+    filters, 
+    updateFilters, 
+    refreshOrders,
+    stats 
+  } = useOrders(merchantId)
+  
+  const { 
+    tracking, 
+    orderStatuses,
+    fetchTracking, 
+    updateTracking,
+    fetchOrderStatuses,
+    loading: trackingLoading 
+  } = useOrderTracking()
+
+  // Local UI state
+  const [selectedOrder, setSelectedOrder] = useState<MerchantOrder | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<MerchantOrderProduct | null>(null)
+  const [trackModalOpen, setTrackModalOpen] = useState(false)
+
+  // Fetch order statuses on mount
+  useEffect(() => {
+    fetchOrderStatuses()
+  }, [])
+
+  // Handle track product click
+  const handleTrackProduct = async (product: MerchantOrderProduct) => {
+    if (!selectedOrder?.orderId || !product?.productID) {
+      console.error("Missing orderId or productId")
+      return
+    }
+
+    setSelectedProduct(product)
+    await fetchTracking(selectedOrder.orderId, product.productID)
+    setTrackModalOpen(true)
+  }
+
+  const getOrderStatuses = async (orderStatus : OrderStatuses) => {
+    // Placeholder for fetching order statuses
+    // Implement API call when endpoint is available
+    await fetchOrderStatuses();
+  }
+
+  // Handle tracking update
+  const handleUpdateTracking = async (updateData: any) => {
+    const success = await updateTracking(updateData)
+    if (success) {
+      // Close the modal and refresh orders
+      setTrackModalOpen(false)
+      refreshOrders()
+    }
+  }
+
+  // Handle close tracking modal
+  const handleCloseTrackingModal = () => {
+    setTrackModalOpen(false)
+    setSelectedProduct(null)
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Orders</h1>
-        <p className="text-muted-foreground">Track and manage all customer orders from your store.</p>
+    <div className="space-y-6 p-6">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground mt-1">
+            Track and manage customer orders in real-time
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshOrders}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">573</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Processing</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23</div>
-            <p className="text-xs text-muted-foreground">Need attention</p>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">All time orders</p>
           </CardContent>
         </Card>
+        
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Shipped</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <TrendingUp className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-muted-foreground">In transit</p>
+            <div className="text-2xl font-bold">{stats.pending}</div>
+            <p className="text-xs text-muted-foreground">Awaiting processing</p>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.processing + stats.shipped}</div>
+            <p className="text-xs text-muted-foreground">Processing & shipped</p>
+          </CardContent>
+        </Card>
+        
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Delivered</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <TrendingDown className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">342</div>
-            <p className="text-xs text-muted-foreground">Completed</p>
+            <div className="text-2xl font-bold">{stats.delivered}</div>
+            <p className="text-xs text-muted-foreground">Successfully completed</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Orders Table */}
+      {/* Main Orders Card */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>View and manage all customer orders with their current status.</CardDescription>
+          <CardDescription>
+            View and manage all customer orders with advanced filtering
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search orders..." className="pl-10" />
-            </div>
-            <Select defaultValue="all">
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="shipped">Shipped</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
-          <div className="rounded-md border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.id}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{order.customer}</div>
-                        <div className="text-sm text-muted-foreground">{order.email}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{order.date}</TableCell>
-                    <TableCell>{order.items}</TableCell>
-                    <TableCell className="font-medium">{order.total}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={statusColors[order.status as keyof typeof statusColors]}>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </TableCell>
+        <CardContent className="space-y-4">
+          {/* Filters */}
+          <OrderFiltersBar 
+            filters={filters} 
+            onFiltersChange={updateFilters}
+            stats={stats}
+          />
+
+          {/* Loading State */}
+          {loading && <OrdersTableSkeleton />}
+
+          {/* Error State */}
+          {error && !loading && (
+            <ErrorState 
+              description={error}
+              retry={refreshOrders}
+            />
+          )}
+
+          {/* Empty State */}
+          {!loading && !error && orders.length === 0 && <OrdersEmptyState />}
+
+          {/* Orders Table */}
+          {!loading && !error && orders.length > 0 && (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[180px]">Order ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-center">Items</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+
+                <TableBody>
+                  {orders.map((order) => (
+                    <TableRow 
+                      key={order.orderId}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
+                      <TableCell className="font-mono text-sm">
+                        {order.orderId.slice(0, 8)}...
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {new Date(order.orderDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center justify-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                          {order.products.length}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        KES {order.subTotal.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <OrderStatusBadge status={order.status} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <Package className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* ORDER PRODUCTS MODAL */}
+      <OrderProductsModal
+        open={!!selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+        products={selectedOrder?.products || []}
+        onTrack={handleTrackProduct}
+      />
+
+      {/* PRODUCT TRACKING MODAL */}
+      <ProductTrackingModal
+        open={trackModalOpen}
+        onClose={handleCloseTrackingModal}
+        product={selectedProduct}
+        tracking={tracking}
+        orderStatuses={orderStatuses}
+        orderId={selectedOrder?.orderId}
+        productId={selectedProduct?.productID}
+        onUpdateTracking={handleUpdateTracking}
+      />
     </div>
   )
 }

@@ -2,9 +2,11 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import { cn } from "@/lib/utils"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -127,19 +129,19 @@ export function CategoriesTable({
 
       {/* Categories Table */}
       {!loading && filteredCategories.length > 0 ? (
-        <div className="rounded-md border border-border overflow-hidden">
+        <div className="rounded-xl border border-border/60 overflow-hidden shadow-sm bg-card">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead>Category</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Parent</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">Sort</TableHead>
-                <TableHead className="text-center">Products</TableHead>
-                <TableHead className="text-center">Subcategories</TableHead>
-                <TableHead className="text-right w-[140px]">Actions</TableHead>
+              <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border/60">
+                <TableHead className="font-semibold text-foreground/90">Category</TableHead>
+                <TableHead className="font-semibold text-foreground/90">Description</TableHead>
+                <TableHead className="font-semibold text-foreground/90">Slug</TableHead>
+                <TableHead className="font-semibold text-foreground/90">Parent</TableHead>
+                <TableHead className="font-semibold text-foreground/90">Status</TableHead>
+                <TableHead className="text-center font-semibold text-foreground/90">Sort</TableHead>
+                <TableHead className="text-center font-semibold text-foreground/90">Products</TableHead>
+                <TableHead className="text-center font-semibold text-foreground/90">Subcategories</TableHead>
+                <TableHead className="text-right font-semibold text-foreground/90 w-[140px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -149,7 +151,10 @@ export function CategoriesTable({
                   {/* Main Category Row */}
                   <TableRow
                     key={category.categoryId}
-                    className="hover:bg-muted/30 transition-colors group"
+                    className={cn(
+                      "hover:bg-muted/50 transition-all duration-200 group border-b border-border/40",
+                      index % 2 === 0 ? "bg-background" : "bg-muted/20"
+                    )}
                     style={{
                       animationDelay: `${index * 50}ms`,
                     }}
@@ -181,22 +186,24 @@ export function CategoriesTable({
                     {/* Description */}
                     <TableCell>
                       {category.description ? (
-                        <div className="relative group">
-                          <p className="text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors max-w-xs">
-                            {category.description.length > 50 
-                              ? `${category.description.substring(0, 30)}...`
-                              : category.description
-                            }
-                          </p>
-                          {category.description.length > 50 && (
-                            <div className="absolute z-50 invisible group-hover:visible bg-popover border border-border rounded-md p-3 shadow-lg max-w-sm -top-2 left-0 transform -translate-y-full">
-                              <p className="text-sm text-popover-foreground whitespace-pre-wrap break-words">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="max-w-[300px] cursor-help">
+                              <p className="text-sm text-muted-foreground hover:text-foreground/80 transition-colors line-clamp-2">
                                 {category.description}
                               </p>
-                              <div className="absolute top-full left-4 w-2 h-2 bg-popover border-r border-b border-border transform rotate-45 -translate-y-1"></div>
                             </div>
-                          )}
-                        </div>
+                          </TooltipTrigger>
+                          <TooltipContent 
+                            side="top" 
+                            className="max-w-sm bg-popover text-popover-foreground border shadow-lg"
+                            sideOffset={5}
+                          >
+                            <p className="text-sm whitespace-pre-wrap break-words">
+                              {category.description}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
                       ) : (
                         <span className="italic text-muted-foreground text-sm">No description</span>
                       )}
@@ -329,7 +336,7 @@ export function CategoriesTable({
                     <>
                       <TableRow
                         key={`sub-${subcategory.id}`}
-                        className="hover:bg-muted/30 transition-colors group bg-blue-50/30"
+                        className="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-200 group bg-blue-50/40 dark:bg-blue-950/10 border-b border-border/30"
                       >
                         <TableCell>
                           <div className="flex items-center gap-3 pl-8">
@@ -351,9 +358,28 @@ export function CategoriesTable({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <p className="text-xs text-muted-foreground">
-                            {subcategory.description || 'No description'}
-                          </p>
+                          {subcategory.description ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="max-w-[250px] cursor-help">
+                                  <p className="text-xs text-muted-foreground hover:text-foreground transition-colors line-clamp-2">
+                                    {subcategory.description}
+                                  </p>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent 
+                                side="top" 
+                                className="max-w-sm bg-popover text-popover-foreground border shadow-lg"
+                                sideOffset={5}
+                              >
+                                <p className="text-xs whitespace-pre-wrap break-words">
+                                  {subcategory.description}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="italic text-muted-foreground text-xs">No description</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <code className="text-xs bg-muted/60 px-1 py-0.5 rounded font-mono">
@@ -433,7 +459,7 @@ export function CategoriesTable({
                       {subcategory.subSubCategories?.map((subSubCategory: any) => (
                         <TableRow
                           key={`subsub-${subSubCategory.id}`}
-                          className="hover:bg-muted/30 transition-colors group bg-purple-50/30"
+                          className="hover:bg-purple-50/50 dark:hover:bg-purple-950/20 transition-all duration-200 group bg-purple-50/40 dark:bg-purple-950/10 border-b border-border/30"
                         >
                           <TableCell>
                             <div className="flex items-center gap-3 pl-16">
@@ -452,9 +478,28 @@ export function CategoriesTable({
                             </div>
                           </TableCell>
                           <TableCell>
-                            <p className="text-xs text-muted-foreground">
-                              {subSubCategory.description || 'No description'}
-                            </p>
+                            {subSubCategory.description ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="max-w-[200px] cursor-help">
+                                    <p className="text-xs text-muted-foreground hover:text-foreground transition-colors line-clamp-2">
+                                      {subSubCategory.description}
+                                    </p>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent 
+                                  side="top" 
+                                  className="max-w-sm bg-popover text-popover-foreground border shadow-lg"
+                                  sideOffset={5}
+                                >
+                                  <p className="text-xs whitespace-pre-wrap break-words">
+                                    {subSubCategory.description}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="italic text-muted-foreground text-xs">No description</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <span className="text-xs text-muted-foreground">-</span>

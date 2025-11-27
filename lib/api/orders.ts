@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Order, PaginatedResponse } from '@/types';
+import { MerchantOrderResponse, Order, OrderStatuses, PaginatedResponse } from '@/types';
 
 export const ordersService = {
   // Get all orders with pagination and filters
@@ -28,9 +28,29 @@ export const ordersService = {
     return apiClient.get<Order>(`/orders/${id}`);
   },
 
+  async getMerchantOrders(merchantId:string) : Promise<MerchantOrderResponse>{
+    return apiClient.get(`/Order/merchant/${merchantId}`);
+  },
+
   // Update order status
   async updateOrderStatus(id: string, status: Order['status'], notes?: string): Promise<Order> {
     return apiClient.patch<Order>(`/orders/${id}/status`, { status, notes });
+  },
+
+  // Get order statuses
+  async getOrderStatuses(): Promise<{data: OrderStatuses[]}> {
+    return apiClient.get<{data: OrderStatuses[]}>('/Order/Statuses');
+  },
+
+  async getTracking(orderId? : string, productId?: string): Promise<any> {
+    return apiClient.post(`/Order/tracking/product/${productId}`,{
+      ProductID : productId,
+      OrderID : orderId
+    });
+  },
+
+  async updateTracking(updates: any): Promise<any> {
+    return apiClient.post(`/Order/tracking/update/${updates.ProductId}`, updates);
   },
 
   // Get pending orders

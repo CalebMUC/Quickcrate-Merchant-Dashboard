@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProductsTable } from "@/components/products-table"
 import { ApprovalQueue } from "@/components/approval-queue"
 import { AddProductModal } from "@/components/add-product-modal"
-import { CategoriesManagement } from "@/components/categories-management"
 import { useProductStats } from "@/hooks/use-product-stats"
 import { Package, Clock, CheckCircle, TrendingUp, AlertCircle } from "lucide-react"
 
@@ -19,7 +18,7 @@ export default function ProductsPage() {
   // Handle URL tab parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab')
-    if (tabParam && ['all', 'categories', 'pending', 'analytics'].includes(tabParam)) {
+    if (tabParam && ['all', 'pending', 'analytics'].includes(tabParam)) {
       setActiveTab(tabParam)
     }
   }, [searchParams])
@@ -105,12 +104,9 @@ export default function ProductsPage() {
         </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[500px]">
           <TabsTrigger value="all" className="transition-all">
             All Products
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="transition-all">
-            Categories
           </TabsTrigger>
           <TabsTrigger value="pending" className="transition-all">
             Approval Queue
@@ -132,10 +128,6 @@ export default function ProductsPage() {
               <ProductsTable />
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="categories" className="space-y-4 animate-in fade-in-50 duration-300">
-          <CategoriesManagement />
         </TabsContent>
 
         <TabsContent value="pending" className="space-y-4 animate-in fade-in-50 duration-300">

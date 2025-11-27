@@ -19,11 +19,12 @@ class ApiClient {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
+     headers: {
+          ...options.headers,                         // user headers FIRST
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),   // ALWAYS last
+        },
+
       ...options,
     };
 

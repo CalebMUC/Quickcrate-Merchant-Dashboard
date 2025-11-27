@@ -115,6 +115,56 @@ function DialogLargeContent({
   )
 }
 
+// Medium Dialog variant — ideal for tables, history logs, or structured content
+function DialogMediumContent({
+  className,
+  children,
+  showCloseButton = true,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  showCloseButton?: boolean
+}) {
+  return (
+    <DialogPortal data-slot="dialog-portal">
+      <DialogOverlay className="bg-black/50 backdrop-blur-[1px]" />
+
+      <DialogPrimitive.Content
+        data-slot="dialog-content"
+        className={cn(
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out " +
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 " +
+            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 " +
+            "fixed top-[50%] left-[50%] z-50 flex flex-col w-[90vw] max-w-3xl " +
+            "max-h-[80vh] translate-x-[-50%] translate-y-[-50%] rounded-xl border shadow-xl duration-300 overflow-hidden",
+          className,
+        )}
+        {...props}
+      >
+        {/* CONTENT AREA */}
+        <div className="flex-1 overflow-auto p-6">{children}</div>
+
+        {/* CLOSE BUTTON */}
+        {showCloseButton && (
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent 
+              data-[state=open]:text-muted-foreground absolute top-4 right-4 z-10 
+              rounded-full bg-white/90 p-2 opacity-70 transition-all hover:opacity-100 
+              hover:bg-white hover:shadow-lg focus:ring-2 focus:ring-offset-2 
+              focus:outline-hidden disabled:pointer-events-none 
+              [&_svg]:pointer-events-none [&_svg]:shrink-0 
+              [&_svg:not([class*='size-'])]:size-5"
+          >
+            <XIcon />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+}
+
+
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -169,6 +219,7 @@ export {
   DialogClose,
   DialogContent,
   DialogLargeContent,
+  DialogMediumContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,

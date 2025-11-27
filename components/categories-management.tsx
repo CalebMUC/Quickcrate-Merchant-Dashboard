@@ -630,16 +630,22 @@ export function CategoriesManagement() {
   return (
     <div className="space-y-6">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Categories Management</h2>
-          <p className="text-muted-foreground">
-            Organize your products with a comprehensive category hierarchy.
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
+        <div className="space-y-1">
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">Categories Management</h2>
+          <p className="text-sm text-muted-foreground">
+            Organize your products with a comprehensive category hierarchy
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="default" 
+            onClick={handleRefresh} 
+            disabled={refreshing}
+            className="shadow-sm hover:shadow transition-shadow"
+          >
             {refreshing ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
@@ -648,7 +654,10 @@ export function CategoriesManagement() {
             Refresh
           </Button>
           
-          <Button onClick={() => setIsAddCategoryOpen(true)}>
+          <Button 
+            onClick={() => setIsAddCategoryOpen(true)}
+            className="shadow-md hover:shadow-lg transition-all duration-200 bg-primary hover:bg-primary/90"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Category
           </Button>
@@ -708,15 +717,23 @@ export function CategoriesManagement() {
 
       {/* Empty State */}
       {!loading && filteredCategories.length === 0 && (
-        <div className="text-center py-12">
-          <Tag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No categories found</h3>
-          <p className="text-muted-foreground mb-4">
-            {searchTerm ? 'No categories match your search criteria.' : 'Create your first category to get started.'}
+        <div className="text-center py-16 px-4">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/50 mb-6">
+            <Tag className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2 text-foreground">No categories found</h3>
+          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+            {searchTerm 
+              ? 'No categories match your search criteria. Try adjusting your filters.' 
+              : 'Create your first category to start organizing your products into a structured hierarchy.'}
           </p>
           {!searchTerm && (
-            <Button onClick={() => setIsAddCategoryOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={() => setIsAddCategoryOpen(true)}
+              size="lg"
+              className="shadow-md hover:shadow-lg transition-all duration-200"
+            >
+              <Plus className="h-5 w-5 mr-2" />
               Add First Category
             </Button>
           )}

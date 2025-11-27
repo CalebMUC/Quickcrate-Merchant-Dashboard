@@ -176,9 +176,19 @@ export const categoriesService = {
       if (response && typeof response === 'object' && 'data' in response && 'success' in response) {
         if (response.success && response.data) {
           // Handle paginated response with items array
-          if (response.data.items && Array.isArray(response.data.items)) {
+          // if (response.data.items && Array.isArray(response.data.items)) {
+          //   return {
+          //     categories: response.data.items,
+          //     totalCount: response.data.totalCount || response.data.items.length,
+          //     page: response.data.page || 1,
+          //     pageSize: response.data.pageSize || response.data.items.length,
+          //     totalPages: response.data.totalPages || 1
+          //   }
+          // }
+
+           if (response.data.data && Array.isArray(response.data.data)) {
             return {
-              categories: response.data.items,
+              categories: response.data.data,
               totalCount: response.data.totalCount || response.data.items.length,
               page: response.data.page || 1,
               pageSize: response.data.pageSize || response.data.items.length,
@@ -263,8 +273,9 @@ export const categoriesService = {
       
       console.log('🔄 CategoriesService: Processed category data:', processedData)
       
-      const response = await apiClient.post<any>('/Categories', processedData)
-      
+      // const response = await apiClient.post<any>('/Categories', processedData)
+  
+      const response = await apiClient.post<any>('/Category', processedData)
       console.log('📦 CategoriesService: Raw create response:', response)
       
       // Handle wrapped API response structure
@@ -369,7 +380,8 @@ export const categoriesService = {
       console.log('🔄 CategoriesService: Processed update data:', processedData)
       
       // Make the API request using POST as required by backend
-      const response = await apiClient.post<any>(`/Categories/${id}`, processedData)
+      // const response = await apiClient.post<any>(`/Categories/${id}`, processedData)
+      const response = await apiClient.post<any>(`/Category/${id}`, processedData)
       
       console.log('📦 CategoriesService: Raw update response:', response)
       
@@ -513,7 +525,9 @@ export const categoriesService = {
     try {
       console.log('🗑️ CategoriesService: Deleting category:', id)
       
-      const response = await apiClient.delete<{ message: string }>(`/Categories/${id}`)
+      // const response = await apiClient.delete<{ message: string }>(`/Categories/${id}`)
+
+      const response = await apiClient.delete<{ message: string }>(`/Category/${id}`)
       
       console.log('✅ CategoriesService: Category deleted successfully:', id)
       
@@ -538,7 +552,7 @@ export const categoriesService = {
     try {
       console.log('📂 CategoriesService: Fetching subcategories for category:', categoryId)
       
-      const response = await apiClient.get<any>(`/Categories/${categoryId}/subcategories`)
+      const response = await apiClient.get<any>(`/Category/${categoryId}/subcategories`)
       
       console.log('✅ CategoriesService: Raw subcategories response:', response)
       
@@ -576,7 +590,9 @@ export const categoriesService = {
       }
       
       // Use the correct endpoint pattern from backend: /Categories/{categoryId}/subcategories
-      const response = await apiClient.post<any>(`/Categories/${subCategoryData.categoryId}/subcategories`, subCategoryData)
+      // const response = await apiClient.post<any>(`/Categories/${subCategoryData.categoryId}/subcategories`, subCategoryData)
+
+      const response = await apiClient.post<any>(`/Category/${subCategoryData.categoryId}/subcategories`, subCategoryData)
       
       console.log('✅ CategoriesService: Raw subcategory create response:', response)
       

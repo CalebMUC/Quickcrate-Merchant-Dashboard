@@ -511,7 +511,10 @@ export function AddProductModal({
         sortOrder: 'asc'
       });
       console.log('✅ Categories loaded:', response.categories.length);
+      //console.log('✅ Categories loaded:', response.data.length);
       setCategories(response.categories);
+
+      //setCategories(response.data);
 
       // Reset subcategories when categories change
       setSubCategories([])

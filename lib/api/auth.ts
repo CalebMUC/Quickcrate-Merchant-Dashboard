@@ -13,7 +13,8 @@ class AuthService {
     console.log('🚀 Real API Login - Sending request to:', '/Authentication/login');
     console.log('📧 Credentials:', { email: credentials.email });
     
-    const response = await apiClient.post<AuthResponse>('/Authentication/login', credentials);
+    //const response = await apiClient.post<AuthResponse>('/Authentication/login', credentials);
+    const response = await apiClient.post<AuthResponse>('/Identity/Merchant/login', credentials);
     console.log('✅ Login API Response:', response);
     
     // Store tokens securely
@@ -47,7 +48,8 @@ class AuthService {
       };
       
       console.log('🚀 Sending request to /Authentication/reset-password with data:', backendData);
-      const response = await apiClient.post<AuthResponse>('/Authentication/reset-password', backendData);
+      // const response = await apiClient.post<AuthResponse>('/Authentication/reset-password', backendData);
+      const response = await apiClient.post<AuthResponse>('/Identity/reset-password', backendData);
       console.log('✅ Real Backend response:', response);
       
       if (response.success && response.data) {
@@ -105,7 +107,12 @@ class AuthService {
 
     try {
       console.log('🚀 Real API Token Refresh - Sending request');
-      const response = await apiClient.post<AuthResponse>('/Authentication/refresh', {
+      // const response = await apiClient.post<AuthResponse>('/Authentication/refresh', {
+      //   refreshToken,
+      //   token,
+      // });
+
+        const response = await apiClient.post<AuthResponse>('/Identity/Merchant/refresh', {
         refreshToken,
         token,
       });

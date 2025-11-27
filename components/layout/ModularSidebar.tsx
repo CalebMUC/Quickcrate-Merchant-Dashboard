@@ -51,9 +51,15 @@ const navigation: NavigationItem[] = [
     icon: Package,
     children: [
       { name: 'All Products', href: '/products', icon: Package },
-      { name: 'Add Product', href: '/products/add', icon: Package },
-      { name: 'Categories', href: '/products/categories', icon: Package },
-      { name: 'Approval Queue', href: '/products/approval', icon: Package, badge: '3' },
+      { name: 'Approval Queue', href: '/products?tab=pending', icon: Package, badge: '3' },
+    ],
+  },
+  {
+    name: 'Categories',
+    icon: Package,
+    children: [
+      { name: 'All Categories', href: '/categories', icon: Package },
+      { name: 'Sub-Categories', href: '/categories/subcategories', icon: Package },
     ],
   },
   {
@@ -62,38 +68,20 @@ const navigation: NavigationItem[] = [
     children: [
       { name: 'All Orders', href: '/orders', icon: ShoppingCart },
       { name: 'Pending Orders', href: '/orders/pending', icon: ShoppingCart, badge: '5' },
-      { name: 'Shipping', href: '/orders/shipping', icon: Truck },
-      { name: 'Returns', href: '/orders/returns', icon: ShoppingCart },
     ],
   },
   {
     name: 'Payments',
     icon: CreditCard,
     children: [
-      { name: 'Transactions', href: '/payments', icon: CreditCard },
-      { name: 'Payouts', href: '/payments/payouts', icon: DollarSign },
+      { name: 'Overview', href: '/payments', icon: CreditCard },
       { name: 'Payment Methods', href: '/payments/methods', icon: CreditCard },
-      { name: 'Billing', href: '/payments/billing', icon: FileText },
     ],
   },
   {
-    name: 'Analytics',
-    icon: TrendingUp,
-    children: [
-      { name: 'Overview', href: '/analytics', icon: BarChart3 },
-      { name: 'Sales Reports', href: '/analytics/sales', icon: TrendingUp },
-      { name: 'Customer Insights', href: '/analytics/customers', icon: Users },
-      { name: 'Performance', href: '/analytics/performance', icon: BarChart3 },
-    ],
-  },
-  {
-    name: 'Customers',
-    icon: Users,
-    children: [
-      { name: 'All Customers', href: '/customers', icon: Users },
-      { name: 'Reviews', href: '/customers/reviews', icon: Star },
-      { name: 'Support Tickets', href: '/customers/support', icon: MessageSquare },
-    ],
+    name: 'Reports',
+    href: '/reports',
+    icon: FileText,
   },
 ];
 
@@ -106,17 +94,18 @@ const secondaryNavigation: NavigationItem[] = [
   },
   {
     name: 'Support',
-    href: '/support',
     icon: HelpCircle,
+    children: [
+      { name: 'Help Center', href: '/support', icon: HelpCircle },
+      { name: 'Contact Support', href: '/support/contact', icon: MessageSquare },
+    ],
   },
   {
     name: 'Settings',
     icon: Settings,
     children: [
+      { name: 'General', href: '/settings', icon: Settings },
       { name: 'Profile', href: '/settings/profile', icon: User },
-      { name: 'Business', href: '/settings/business', icon: Store },
-      { name: 'Security', href: '/settings/security', icon: Shield },
-      { name: 'Integrations', href: '/settings/integrations', icon: Globe },
     ],
   },
 ];
@@ -124,7 +113,7 @@ const secondaryNavigation: NavigationItem[] = [
 export function ModularSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Products', 'Orders']);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const toggleExpanded = (itemName: string) => {
     setExpandedItems(prev =>

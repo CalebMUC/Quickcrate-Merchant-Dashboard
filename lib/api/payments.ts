@@ -1,7 +1,103 @@
 import { apiClient } from './client';
-import { Transaction, PaymentMethod, PaginatedResponse } from '@/types';
+import { 
+  Transaction, 
+  PaymentMethod, 
+  PaginatedResponse,
+  Payout,
+  PayoutStats,
+  MerchantTransaction,
+  MerchantPaymentMethod,
+  CreatePaymentMethodRequest
+} from '@/types';
 
 export const paymentsService = {
+  // ==================== PAYOUT ENDPOINTS ====================
+  
+  /**
+   * Get payout statistics for the authenticated merchant
+   */
+  async getPayoutStats(): Promise<PayoutStats> {
+    return apiClient.get<PayoutStats>('/payouts/stats');
+  },
+
+  /**
+   * Get all payouts for the authenticated merchant
+   */
+  async getMerchantPayouts(status?: string): Promise<Payout[]> {
+    const query = status ? `?status=${status}` : '';
+    return apiClient.get<Payout[]>(`/payouts${query}`);
+  },
+
+  /**
+   * Get a specific payout by ID with full details
+   */
+  async getPayoutById(payoutId: string): Promise<Payout> {
+    return apiClient.get<Payout>(`/payouts/${payoutId}`);
+  },
+
+  /**
+   * Get transaction history for the authenticated merchant
+   */
+  async getMerchantTransactions(params?: {
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }): Promise<MerchantTransaction[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    return apiClient.get<MerchantTransaction[]>(`/payouts/transactions${query}`);
+  },
+
+  // ==================== PAYMENT METHOD ENDPOINTS ====================
+  
+  /**
+   * Get all payment methods for the authenticated merchant
+   */
+  async getMerchantPaymentMethods(): Promise<MerchantPaymentMethod[]> {
+    return apiClient.get<MerchantPaymentMethod[]>('/payouts/payment-methods');
+  },
+
+  /**
+   * Get a specific payment method by ID
+   */
+  async getPaymentMethodById(id: string): Promise<MerchantPaymentMethod> {
+    return apiClient.get<MerchantPaymentMethod>(`/payouts/payment-methods/${id}`);
+  },
+
+  /**
+   * Add a new payment method
+   */
+  async createPaymentMethod(methodData: CreatePaymentMethodRequest): Promise<MerchantPaymentMethod> {
+    return apiClient.post<MerchantPaymentMethod>('/payouts/payment-methods', methodData);
+  },
+
+  /**
+   * Update an existing payment method
+   */
+  async updatePaymentMethod(id: string, methodData: Partial<CreatePaymentMethodRequest>): Promise<MerchantPaymentMethod> {
+    return apiClient.put<MerchantPaymentMethod>(`/payouts/payment-methods/${id}`, methodData);
+  },
+
+  /**
+   * Delete a payment method
+   */
+  async deletePaymentMethod(id: string): Promise<{ message: string }> {
+    return apiClient.delete<{ message: string }>(`/payouts/payment-methods/${id}`);
+  },
+
+  /**
+   * Set a payment method as primary
+   */
+  async setPrimaryPaymentMethod(id: string): Promise<MerchantPaymentMethod> {
+    return apiClient.post<MerchantPaymentMethod>(`/payouts/payment-methods/${id}/set-primary`);
+  },
+
+  // ==================== LEGACY TRANSACTION ENDPOINTS ====================
+  
   // Get all transactions
   async getTransactions(params?: {
     page?: number;
@@ -28,12 +124,12 @@ export const paymentsService = {
     return apiClient.get<Transaction>(`/payments/transactions/${id}`);
   },
 
-  // Get payment methods
+  // Get payment methods (legacy)
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     return apiClient.get<PaymentMethod[]>('/payments/methods');
   },
 
-  // Add payment method
+  // Add payment method (legacy)
   async addPaymentMethod(methodData: {
     type: PaymentMethod['type'];
     name: string;
@@ -42,22 +138,7 @@ export const paymentsService = {
     return apiClient.post<PaymentMethod>('/payments/methods', methodData);
   },
 
-  // Update payment method
-  async updatePaymentMethod(id: string, methodData: Partial<PaymentMethod>): Promise<PaymentMethod> {
-    return apiClient.put<PaymentMethod>(`/payments/methods/${id}`, methodData);
-  },
-
-  // Delete payment method
-  async deletePaymentMethod(id: string): Promise<{ message: string }> {
-    return apiClient.delete<{ message: string }>(`/payments/methods/${id}`);
-  },
-
-  // Set primary payment method
-  async setPrimaryPaymentMethod(id: string): Promise<PaymentMethod> {
-    return apiClient.post<PaymentMethod>(`/payments/methods/${id}/set-primary`);
-  },
-
-  // Get payment statistics
+  // Get payment statistics (legacy)
   async getPaymentStats(): Promise<{
     totalEarned: number;
     pendingPayouts: number;
@@ -69,7 +150,7 @@ export const paymentsService = {
     return apiClient.get('/payments/stats');
   },
 
-  // Get payout schedule
+  // Get payout schedule (legacy)
   async getPayouts(params?: {
     page?: number;
     limit?: number;
