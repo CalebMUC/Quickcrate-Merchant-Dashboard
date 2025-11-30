@@ -1,23 +1,50 @@
 "use client"
 
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
-
-const data = [
-  { name: "Jan", total: 15000 },
-  { name: "Feb", total: 18000 },
-  { name: "Mar", total: 22000 },
-  { name: "Apr", total: 19000 },
-  { name: "May", total: 25000 },
-  { name: "Jun", total: 28000 },
-  { name: "Jul", total: 32000 },
-  { name: "Aug", total: 29000 },
-  { name: "Sep", total: 35000 },
-  { name: "Oct", total: 38000 },
-  { name: "Nov", total: 42000 },
-  { name: "Dec", total: 45000 },
-]
+import { dashboardService } from "@/lib/api/dashboard"
+import { useAuth } from "@/lib/contexts/AuthContext"
+import { useEffect, useState } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
 
 export function SalesChart() {
+  const { user } = useAuth();
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const merchantId = user?.merchantId || 'ea1989e3-f9c4-4ff5-86bf-a24148aa570e';
+
+  useEffect(() => {
+    const fetchSalesData = async () => {
+      try {
+        setLoading(true);
+        const response = await dashboardService.getSalesData(merchantId, '12months');
+        setData(response.data.map(item => ({
+          name: item.period,
+          total: item.revenue,
+        })));
+      } catch (error: any) {
+        console.error('Failed to load sales data:', error);
+        toast.error('Failed to load sales data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSalesData();
+  }, [merchantId]);
+
+  if (loading) {
+    return <Skeleton className="w-full h-[350px]" />;
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[350px] text-muted-foreground">
+        No sales data available
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={350}>
       <AreaChart data={data}>

@@ -28,6 +28,7 @@ interface Product {
   productName: string;
   quantity: number;
   price: number;
+  currentStatus?: string;
 }
 
 interface OrderProductsModalProps {
@@ -40,6 +41,15 @@ interface OrderProductsModalProps {
 export function OrderProductsModal({ open, onClose, products, onTrack }: OrderProductsModalProps) {
   const totalItems = products.reduce((sum, p) => sum + p.quantity, 0);
   const totalValue = products.reduce((sum, p) => sum + (p.quantity * p.price), 0);
+
+  const getStatusVariant = (status?: string): "default" | "secondary" | "destructive" | "outline" => {
+    if (!status) return "secondary";
+    const normalized = status.toLowerCase();
+    if (normalized.includes('delivered')) return "default";
+    if (normalized.includes('shipped') || normalized.includes('transit')) return "outline";
+    if (normalized.includes('failed') || normalized.includes('cancelled')) return "destructive";
+    return "secondary";
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -94,6 +104,7 @@ export function OrderProductsModal({ open, onClose, products, onTrack }: OrderPr
                   <TableHead className="text-center">Qty</TableHead>
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Subtotal</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -125,6 +136,12 @@ export function OrderProductsModal({ open, onClose, products, onTrack }: OrderPr
                     
                     <TableCell className="text-right font-semibold">
                       KES {(p.quantity * p.price).toLocaleString()}
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <Badge variant={getStatusVariant(p.currentStatus)} className="capitalize">
+                        {p.currentStatus || 'Pending'}
+                      </Badge>
                     </TableCell>
                     
                     <TableCell className="text-right">

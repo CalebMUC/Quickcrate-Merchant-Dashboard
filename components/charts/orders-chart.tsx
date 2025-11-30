@@ -1,15 +1,53 @@
 "use client"
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
-
-const data = [
-  { name: "Delivered", value: 342, color: "#22c55e" }, // Green for delivered
-  { name: "Shipped", value: 156, color: "#3b82f6" }, // Blue for shipped
-  { name: "Pending", value: 75, color: "#f59e0b" }, // Amber for pending
-  { name: "Cancelled", value: 23, color: "#ef4444" }, // Red for cancelled
-]
+import { dashboardService } from "@/lib/api/dashboard"
+import { useAuth } from "@/lib/contexts/AuthContext"
+import { useEffect, useState } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
 
 export function OrdersChart() {
+  const { user } = useAuth();
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const merchantId = user?.merchantId || 'ea1989e3-f9c4-4ff5-86bf-a24148aa570e';
+
+  useEffect(() => {
+    const fetchOrderStatus = async () => {
+      try {
+        setLoading(true);
+        const response = await dashboardService.getOrderStatusDistribution(merchantId);
+        const formattedData = response.data.map(item => ({
+          name: item.status,
+          value: item.count,
+          color: item.color,
+          percentage: item.percentage,
+        }));
+        setData(formattedData);
+      } catch (error: any) {
+        console.error('Failed to load order status:', error);
+        toast.error('Failed to load order status');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderStatus();
+  }, [merchantId]);
+
+  if (loading) {
+    return <Skeleton className="w-full h-[300px]" />;
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+        No order data available
+      </div>
+    );
+  }
+
   return (
     <div className="animate-in fade-in-50 duration-500">
       <ResponsiveContainer width="100%" height={300}>
@@ -31,17 +69,17 @@ export function OrdersChart() {
           <Tooltip
             content={({ active, payload }) => {
               if (active && payload && payload.length) {
+                const statusData = payload[0].payload;
                 return (
                   <div className="rounded-lg border bg-background p-3 shadow-lg animate-in fade-in-0 duration-150">
                     <div className="grid grid-cols-1 gap-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: payload[0].payload.color }} />
-                        <span className="text-sm font-medium">{payload[0].name}</span>
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusData.color }} />
+                        <span className="text-sm font-medium">{statusData.name}</span>
                       </div>
-                      <span className="font-bold text-lg">{payload[0].value} orders</span>
+                      <span className="font-bold text-lg">{statusData.value} orders</span>
                       <span className="text-xs text-muted-foreground">
-                        {((payload[0].value / data.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}% of
-                        total
+                        {statusData.percentage.toFixed(1)}% of total
                       </span>
                     </div>
                   </div>

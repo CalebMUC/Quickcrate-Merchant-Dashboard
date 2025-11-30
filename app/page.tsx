@@ -1,36 +1,80 @@
+"use client"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, Package, Users, ShoppingCart, TrendingUp } from "lucide-react"
+import { DollarSign, Package, ShoppingCart, TrendingUp, TrendingDown, RefreshCw } from "lucide-react"
 import { SalesChart } from "@/components/charts/sales-chart"
 import { OrdersChart } from "@/components/charts/orders-chart"
 import { TopProductsChart } from "@/components/charts/top-products-chart"
 import { PaymentMethodsChart } from "@/components/payment-methods-chart"
 import { RecentOrders } from "@/components/recent-orders"
 import { AnalyticsSummary } from "@/components/analytics-summary"
+import { useDashboard } from "@/hooks/useDashboard"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
 
 export default function DashboardPage() {
+  const { summary, loading, error, refresh } = useDashboard();
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 space-y-4">
+        <div className="text-center">
+          <p className="text-red-500 text-lg font-semibold">Error loading dashboard</p>
+          <p className="text-muted-foreground">{error}</p>
+        </div>
+        <Button onClick={refresh} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="animate-in fade-in-50 duration-500">
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's what's happening with your store today.</p>
+      <div className="animate-in fade-in-50 duration-500 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back! Here's what's happening with your store today.</p>
+        </div>
+        <Button onClick={refresh} variant="outline" size="sm">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Revenue Card */}
         <Card className="animate-in slide-in-from-left-5 duration-500 hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$45,231.89</div>
+            <div className="text-2xl font-bold">
+              KES {summary?.revenue.total.toLocaleString() || 0}
+            </div>
             <div className="flex items-center gap-1 text-xs">
-              <TrendingUp className="h-3 w-3 text-green-500" />
-              <span className="text-green-500 font-medium">+20.1%</span>
+              {(summary?.revenue.growth || 0) >= 0 ? (
+                <TrendingUp className="h-3 w-3 text-green-500" />
+              ) : (
+                <TrendingDown className="h-3 w-3 text-red-500" />
+              )}
+              <span className={`font-medium ${
+                (summary?.revenue.growth || 0) >= 0 ? 'text-green-500' : 'text-red-500'
+              }`}>
+                {(summary?.revenue.growth || 0) >= 0 ? '+' : ''}{summary?.revenue.growth.toFixed(1)}%
+              </span>
               <span className="text-muted-foreground">from last month</span>
             </div>
           </CardContent>
         </Card>
 
+        {/* Products Card */}
         <Card
           className="animate-in slide-in-from-left-5 duration-500 hover:shadow-lg transition-shadow"
           style={{ animationDelay: "100ms" }}
@@ -40,46 +84,29 @@ export default function DashboardPage() {
             <Package className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,234</div>
+            <div className="text-2xl font-bold">{summary?.products.total || 0}</div>
             <div className="flex items-center gap-1 text-xs">
               <TrendingUp className="h-3 w-3 text-green-500" />
-              <span className="text-green-500 font-medium">+12</span>
+              <span className="text-green-500 font-medium">+{summary?.products.newThisWeek || 0}</span>
               <span className="text-muted-foreground">new this week</span>
             </div>
           </CardContent>
         </Card>
 
+        {/* Orders Card */}
         <Card
           className="animate-in slide-in-from-left-5 duration-500 hover:shadow-lg transition-shadow"
           style={{ animationDelay: "200ms" }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Customers</CardTitle>
-            <Users className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">2,350</div>
-            <div className="flex items-center gap-1 text-xs">
-              <TrendingUp className="h-3 w-3 text-green-500" />
-              <span className="text-green-500 font-medium">+180.1%</span>
-              <span className="text-muted-foreground">from last month</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="animate-in slide-in-from-left-5 duration-500 hover:shadow-lg transition-shadow"
-          style={{ animationDelay: "300ms" }}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Orders</CardTitle>
             <ShoppingCart className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">573</div>
+            <div className="text-2xl font-bold">{summary?.orders.total || 0}</div>
             <div className="flex items-center gap-1 text-xs">
               <TrendingUp className="h-3 w-3 text-green-500" />
-              <span className="text-green-500 font-medium">+201</span>
+              <span className="text-green-500 font-medium">+{summary?.orders.newSinceLastHour || 0}</span>
               <span className="text-muted-foreground">since last hour</span>
             </div>
           </CardContent>
@@ -154,4 +181,30 @@ export default function DashboardPage() {
       </div>
     </div>
   )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-5 w-96" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+      </div>
+      <Skeleton className="h-64 w-full" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Skeleton className="col-span-4 h-96" />
+        <Skeleton className="col-span-3 h-96" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="h-80" />
+        <Skeleton className="h-80" />
+        <Skeleton className="h-80" />
+      </div>
+    </div>
+  );
 }

@@ -626,7 +626,7 @@ export const productsService = {
   // Update product status (approve/reject/pending/etc.)
   async updateProductStatus(id: string, status: string): Promise<{ message: string }> {
     // Backend expects just a string in the body
-    return apiClient.patch<{ message: string }>(`/Products/${id}/status`, status);
+    return apiClient.post<{ message: string }>(`/Product/approve/${id}`,{status : status,comment : "Product Approval"});
   },
 
   // Approve product (using status update)
